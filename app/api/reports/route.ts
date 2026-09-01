@@ -24,22 +24,28 @@ export async function POST(request: Request) {
     if (!linked) return Response.json({ error: 'Selecione uma rodada e um teste válidos' }, { status: 400 });
     roundTitle = linked.round_title; roundVersion = linked.round_version; itemTitle = linked.item_title;
   }
-  const institution = value(data, 'institution') || (fromTestRound ? 'Rodada interna de testes' : ''), functionName = value(data, 'function'), systemPath = value(data, 'path'), description = value(data, 'description');
+  const institution = value(data, 'institution') || (fromTestRound ? 'Rodada interna de testes' : ''), functionName = value(data, 'function'), systemPath = value(data, 'path');
+  const descriptionDraft = parseDescription(value(data, 'description'));
   const backup = data.get('backup');
   const hasBackup = value(data, 'hasBackup') === 'yes';
   const hasAttachments = value(data, 'hasAttachments') === 'yes';
-  if (!institution || !functionName || !systemPath || !description) return Response.json({ error: 'Campos obrigatórios ausentes' }, { status: 400 });
+  if (!institution || !functionName || !systemPath || !descriptionDraft.some((block) => block.type === 'image' || block.value.trim())) return Response.json({ error: 'Campos obrigatórios ausentes' }, { status: 400 });
   const backupFile = backup instanceof File && backup.size > 0 ? backup : null;
   if (hasBackup && (!backupFile || (!backupFile.name.toLowerCase().endsWith('.csv') && backupFile.type !== 'text/csv'))) return Response.json({ error: 'Você marcou que possui cópia; anexe o arquivo CSV' }, { status: 400 });
   if (backupFile && backupFile.size > MAX_FILE_BYTES) return Response.json({ error: 'O CSV excede 10 MB' }, { status: 413 });
   const screenshots = data.getAll('screenshots').filter((item): item is File => item instanceof File && item.size > 0);
-  if (hasAttachments && screenshots.length === 0) return Response.json({ error: 'Você marcou que possui anexos; selecione ao menos um print' }, { status: 400 });
+  const inlineImages = data.getAll('inlineImages').filter((item): item is File => item instanceof File && item.size > 0);
+  if (hasAttachments && screenshots.length === 0 && inlineImages.length === 0) return Response.json({ error: 'Você marcou que possui anexos; selecione ao menos um print' }, { status: 400 });
   if (screenshots.some((file) => !IMAGE_TYPES.has(file.type) || file.size > MAX_FILE_BYTES)) return Response.json({ error: 'Print inválido ou maior que 10 MB' }, { status: 400 });
+  if (inlineImages.some((file) => !IMAGE_TYPES.has(file.type) || file.size > MAX_FILE_BYTES)) return Response.json({ error: 'Imagem inserida no texto inválida ou maior que 10 MB' }, { status: 400 });
+  if (descriptionDraft.some((block) => block.type === 'image' && (block.fileIndex < 0 || block.fileIndex >= inlineImages.length))) return Response.json({ error: 'Não foi possível relacionar uma imagem inserida no texto' }, { status: 400 });
   const now = Date.now(), id = `BUG-${new Date(now).getFullYear()}-${String(now).slice(-5)}`, storedKeys: string[] = [];
   try {
-    const files = [...(hasBackup && backupFile ? [{ file: backupFile, kind: 'backup' }] : []), ...(hasAttachments ? screenshots.map((file) => ({ file, kind: 'screenshot' })) : [])];
+    const files = [...inlineImages.map((file) => ({ file, kind: 'inline' })), ...(hasBackup && backupFile ? [{ file: backupFile, kind: 'backup' }] : []), ...(hasAttachments ? screenshots.map((file) => ({ file, kind: 'screenshot' })) : [])];
     const rows: Array<{ id: string; key: string; file: File; kind: string }> = [];
     for (const { file, kind } of files) { const attachmentId = crypto.randomUUID(), key = `reports/${id}/${attachmentId}-${safeName(file.name)}`; await env.FILES.put(key, file.stream(), { httpMetadata: { contentType: file.type || 'application/octet-stream' } }); storedKeys.push(key); rows.push({ id: attachmentId, key, file, kind }); }
+    const inlineRows = rows.filter((row) => row.kind === 'inline');
+    const description = JSON.stringify({ version: 1, blocks: descriptionDraft.map((block) => block.type === 'text' ? { type: 'text', value: block.value } : { type: 'image', attachmentId: inlineRows[block.fileIndex]?.id, caption: block.caption }) });
     await env.DB.batch([
       env.DB.prepare(`INSERT INTO reports (id,institution,city,copy_number,inep,client_name,phone,function_name,version,system_path,description,school_year,urgent,beta_status,workaround,from_test_round,test_round_id,test_round_title,test_round_version,test_item_id,test_item_title,status,author_id,author_email,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id, institution, value(data,'city'), value(data,'copy'), value(data,'inep'), value(data,'clientName'), value(data,'phone'), functionName, value(data,'version') || roundVersion, systemPath, description, value(data,'schoolYear'), value(data,'urgent') === 'yes' ? 1 : 0, value(data,'beta') || 'Não testado', value(data,'workaround'), fromTestRound ? 1 : 0, fromTestRound ? roundId : null, fromTestRound ? roundTitle : null, fromTestRound ? roundVersion : null, fromTestRound ? itemId : null, fromTestRound ? itemTitle : null, 'Novo report', user.userId, user.email, now, now),
       env.DB.prepare('INSERT INTO activities (id,report_id,actor_id,actor_email,action,message,created_at) VALUES (?,?,?,?,?,?,?)').bind(crypto.randomUUID(), id, user.userId, user.email, 'report_created', 'Report criado e enviado ao Desenvolvimento.', now),
@@ -50,3 +56,11 @@ export async function POST(request: Request) {
 }
 function value(data: FormData, name: string) { const item = data.get(name); return typeof item === 'string' ? item.trim() : ''; }
 function safeName(name: string) { return name.normalize('NFKD').replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-').slice(0, 120); }
+type DescriptionBlock = { type: 'text'; value: string; fileIndex: -1; caption: '' } | { type: 'image'; value: ''; fileIndex: number; caption: string };
+function parseDescription(raw: string): DescriptionBlock[] {
+  try {
+    const parsed = JSON.parse(raw) as { version?: number; blocks?: Array<{ type?: string; value?: string; fileIndex?: number; caption?: string }> };
+    if (parsed.version === 1 && Array.isArray(parsed.blocks)) return parsed.blocks.slice(0, 60).flatMap((block): DescriptionBlock[] => block.type === 'image' && Number.isInteger(block.fileIndex) ? [{ type: 'image', value: '', fileIndex: Number(block.fileIndex), caption: String(block.caption || '').slice(0, 300) }] : block.type === 'text' ? [{ type: 'text', value: String(block.value || '').slice(0, 20000), fileIndex: -1, caption: '' }] : []);
+  } catch { /* Texto simples de clientes antigos. */ }
+  return [{ type: 'text', value: raw.slice(0, 20000), fileIndex: -1, caption: '' }];
+}

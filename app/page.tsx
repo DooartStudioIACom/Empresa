@@ -19,6 +19,7 @@ type ReportDetail = {
   attachments: Array<{ id: string; file_name: string; content_type: string; byte_size: number; kind: string; created_at: number }>;
   activities: Array<{ id: string; actor_email: string; action: string; message: string | null; created_at: number }>;
 };
+type ReportEditorBlock = { key: number; type: 'text'; value: string } | { key: number; type: 'image'; file: File; preview: string; caption: string };
 type TestRoundItem = { id: string; round_id: string; position: number; title: string; path: string | null; description: string | null; status: string; tester_email: string | null; tester_name?: string | null; result_note: string | null; updated_at: number; response_updated_at?: number | null };
 type RoundParticipant = { round_id: string; user_id: string; user_email: string; user_name: string; total_items: number; done_items: number; bug_items: number; progress: number; completed_at: number | null; is_current: boolean };
 type TestRound = { id: string; title: string; version: string; deadline: string; description: string | null; status: string; author_email: string; created_at: number; updated_at: number; items: TestRoundItem[]; participants?: RoundParticipant[] };
@@ -53,6 +54,7 @@ export default function Home() {
   const [reportRounds, setReportRounds] = useState<TestRound[]>([]);
   const [linkedRoundId, setLinkedRoundId] = useState('');
   const [linkedItemId, setLinkedItemId] = useState('');
+  const [reportBlocks, setReportBlocks] = useState<ReportEditorBlock[]>([{ key: 1, type: 'text', value: '' }]);
   const [reportDetail, setReportDetail] = useState<ReportDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [replying, setReplying] = useState(false);
@@ -102,6 +104,10 @@ export default function Home() {
     event.preventDefault();
     const form = event.currentTarget;
     setFormError(null);
+    if (!reportBlocks.some((block) => block.type === 'image' || block.value.trim())) {
+      setFormError('Escreva a descrição do erro ou insira uma imagem no texto.');
+      return;
+    }
     if (!form.checkValidity()) {
       const firstInvalid = form.querySelector<HTMLElement>(':invalid');
       firstInvalid?.focus();
@@ -111,6 +117,9 @@ export default function Home() {
     setSaving(true);
     setSaved(false);
     const data = new FormData(form);
+    let inlineIndex = 0;
+    data.set('description', JSON.stringify({ version: 1, blocks: reportBlocks.map((block) => block.type === 'text' ? { type: 'text', value: block.value } : { type: 'image', fileIndex: inlineIndex++, caption: block.caption, fileName: block.file.name }) }));
+    reportBlocks.forEach((block) => { if (block.type === 'image') data.append('inlineImages', block.file); });
     try {
       const response = await fetch('/api/reports', { method: 'POST', body: data });
       if (!response.ok) {
@@ -125,7 +134,7 @@ export default function Home() {
         copy: String(data.get('copy') || 'Sem cópia'),
         version: String(data.get('version') || 'Sem versão'),
         status: 'Novo report', tone: 'red', owner: userInitials, updated: 'agora',
-        attachments: (hasBackup ? 1 : 0) + (hasAttachments ? data.getAll('screenshots').filter((file) => file instanceof File && file.size > 0).length : 0),
+        attachments: (hasBackup ? 1 : 0) + (hasAttachments ? data.getAll('screenshots').filter((file) => file instanceof File && file.size > 0).length : 0) + data.getAll('inlineImages').filter((file) => file instanceof File && file.size > 0).length,
       }, ...current]);
       setSaved(true);
       form.reset();
@@ -134,6 +143,8 @@ export default function Home() {
       setFromTestRound(false);
       setLinkedRoundId('');
       setLinkedItemId('');
+      reportBlocks.forEach((block) => { if (block.type === 'image') URL.revokeObjectURL(block.preview); });
+      setReportBlocks([{ key: Date.now(), type: 'text', value: '' }]);
       window.setTimeout(() => { setNewReportOpen(false); setSaved(false); }, 900);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Não foi possível salvar o report. Tente novamente.');
@@ -292,7 +303,7 @@ export default function Home() {
               <FormSection title="Diagnóstico" description="Informe exatamente onde e como o erro acontece.">
                 <div className="grid gap-4 sm:grid-cols-2"><Field label="Função"><Input name="function" required placeholder="Integração SEED-PR" /></Field><Field label="Versão / rodada"><Input name="version" placeholder="U+ 009/26" /></Field></div>
                 <Field label="Caminho no sistema"><Input name="path" required placeholder="Sua Conta > Integração > SEED-PR" /></Field>
-                <Field label="Descrição do erro"><Textarea name="description" required className="min-h-28" placeholder="Descreva o que foi feito, o resultado encontrado e a mensagem exibida..." /></Field>
+                <Field label="Descrição do erro"><InlineReportEditor blocks={reportBlocks} onChange={setReportBlocks} /></Field>
                 <div className="grid gap-4 sm:grid-cols-3"><Field label="Ano letivo"><Input name="schoolYear" placeholder="2026" /></Field><Field label="Urgência"><select name="urgent" className="form-select"><option value="yes">Sim</option><option value="no">Não</option></select></Field><Field label="Ocorre no beta?"><select name="beta" className="form-select"><option>Não testado</option><option>Sim</option><option>Não</option></select></Field></div>
                 <Field label="Contorno encontrado"><Textarea name="workaround" placeholder="Não consegui fazer a reversão." /></Field>
               </FormSection>
@@ -304,7 +315,7 @@ export default function Home() {
                   <OptionToggle checked={hasAttachments} onChange={setHasAttachments} icon={FileImage} title="Possui anexos?" description="Prints ou imagens do erro" />
                 </div>
                 {hasBackup && <label className="upload-zone border-[#d5e2da] bg-[#f8fbf9]"><UploadCloud className="size-5 text-[#3b7755]" /><span><strong>Cópia de segurança (.csv) *</strong><small>Obrigatória enquanto “Possui cópia” estiver em Sim</small></span><Input name="backup" type="file" accept=".csv,text/csv" required className="file-input" /></label>}
-                {hasAttachments && <label className="upload-zone"><FileImage className="size-5 text-[#6b7d73]" /><span><strong>Prints do erro *</strong><small>PNG, JPG ou WEBP · selecione um ou mais arquivos</small></span><Input name="screenshots" type="file" accept="image/png,image/jpeg,image/webp" multiple required className="file-input" /></label>}
+                {hasAttachments && <label className="upload-zone"><FileImage className="size-5 text-[#6b7d73]" /><span><strong>Outros prints do erro</strong><small>Opcional quando já houver imagem inserida no texto</small></span><Input name="screenshots" type="file" accept="image/png,image/jpeg,image/webp" multiple required={!reportBlocks.some((block) => block.type === 'image')} className="file-input" /></label>}
               </FormSection>
               <label className="flex items-start gap-3 rounded-xl border border-[#dfe8e2] bg-[#f8fbf9] p-4 text-xs leading-5 text-[#52655a]"><input required type="checkbox" className="mt-1 accent-[#296444]" /><span>Confirmo que as informações acima representam corretamente o que acompanha este report.</span></label>
             </div>
@@ -323,7 +334,7 @@ export default function Home() {
             {detailLoading && <div className="flex items-center justify-center gap-2 py-12 text-xs text-[#718078]"><LoaderCircle className="size-4 animate-spin" /> Carregando report...</div>}
             {!detailLoading && <div className="grid gap-6 px-6 py-5 md:grid-cols-[1fr_220px]">
               <div className="space-y-5">
-                <div><p className="detail-label">Descrição do erro</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#3d4e45]">{String(reportDetail?.report.description || 'Cliente tenta realizar a operação e o sistema apresenta um erro, impedindo a conclusão.')}</p></div>
+                <div><p className="detail-label">Descrição do erro</p><ReportDescription value={String(reportDetail?.report.description || 'Cliente tenta realizar a operação e o sistema apresenta um erro, impedindo a conclusão.')} attachments={reportDetail?.attachments || []} /></div>
                 <div><p className="detail-label">Caminho</p><p className="mt-2 rounded-lg bg-[#f4f7f5] px-3 py-2 font-mono text-xs text-[#405449]">{String(reportDetail?.report.system_path || 'Caminho informado no report')}</p></div>
                 <div><p className="detail-label">Linha do tempo</p><div className="mt-3 space-y-4 border-l border-[#dce5df] pl-5">
                   {reportDetail?.activities.length ? reportDetail.activities.map((activity) => <Timeline key={activity.id} name={actorName(activity.actor_email)} role={activity.action === 'status_update' ? 'Atualização de status' : activity.action === 'attachment_added' ? 'Anexo' : 'Equipe'} time={formatDateTime(activity.created_at)} text={activity.message || 'Atualização registrada.'} highlighted={activity.action === 'status_update'} />) : <Timeline name="Equipe GEHA" role="Suporte" time="Histórico inicial" text="Report registrado para análise da equipe." />}
@@ -519,6 +530,28 @@ function TeamView({ currentUserName, currentUserInitials }: { currentUserName: s
 function ViewHeading({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action: React.ReactNode }) { return <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[.13em] text-[#4f7b62]">{eyebrow}</p><h2 className="mt-2 text-2xl font-semibold tracking-[-.035em]">{title}</h2><p className="mt-1.5 max-w-2xl text-sm text-[#708078]">{description}</p></div>{action}</div>; }
 function MiniStat({ value, label, tone }: { value: string; label: string; tone: string }) { return <article className="rounded-2xl border border-[#dce5df] bg-white p-4"><div className={`mb-3 h-1 w-9 rounded-full stat-${tone}`} /><p className="text-xl font-semibold tracking-[-.03em]">{value}</p><p className="mt-1 text-[11px] text-[#78867e]">{label}</p></article>; }
 function InfoPanel({ icon: Icon, title, value, note }: { icon: typeof CalendarDays; title: string; value: string; note: string }) { return <section className="rounded-2xl border border-[#dce5df] bg-white p-5"><div className="flex items-start gap-3"><span className="grid size-9 place-items-center rounded-xl bg-[#eef5f0] text-[#3b7655]"><Icon className="size-4" /></span><div><p className="text-[10px] font-medium text-[#7b8981]">{title}</p><p className="mt-1 text-sm font-semibold">{value}</p><p className="mt-1 text-[10px] text-[#87938c]">{note}</p></div></div></section>; }
+
+function InlineReportEditor({ blocks, onChange }: { blocks: ReportEditorBlock[]; onChange: (blocks: ReportEditorBlock[]) => void }) {
+  function addImage(afterIndex: number, file?: File) {
+    if (!file) return;
+    const image: ReportEditorBlock = { key: Date.now(), type: 'image', file, preview: URL.createObjectURL(file), caption: '' };
+    const text: ReportEditorBlock = { key: Date.now() + 1, type: 'text', value: '' };
+    onChange([...blocks.slice(0, afterIndex + 1), image, text, ...blocks.slice(afterIndex + 1)]);
+  }
+  function removeImage(key: number) {
+    const target = blocks.find((block) => block.key === key);
+    if (target?.type === 'image') URL.revokeObjectURL(target.preview);
+    onChange(blocks.filter((block) => block.key !== key));
+  }
+  return <div className="overflow-hidden rounded-2xl border border-[#ccd9d1] bg-white focus-within:border-[#769b84] focus-within:ring-2 focus-within:ring-[#769b8420]"><div className="flex items-center justify-between border-b border-[#e6ece8] bg-[#f6f9f7] px-4 py-2.5"><span className="text-[10px] font-semibold uppercase tracking-[.09em] text-[#63736a]">Texto e evidências</span><span className="text-[9px] font-normal text-[#87938c]">PNG, JPG ou WEBP · até 10 MB</span></div><div className="space-y-3 p-3">{blocks.map((block, index) => block.type === 'text' ? <div key={block.key}><Textarea value={block.value} onChange={(event) => onChange(blocks.map((entry) => entry.key === block.key && entry.type === 'text' ? { ...entry, value: event.target.value } : entry))} className="min-h-24 resize-y border-0 bg-transparent px-2 shadow-none focus-visible:ring-0" placeholder={index === 0 ? 'Descreva o que foi feito e o resultado encontrado...' : 'Continue explicando abaixo da imagem...'} /><button type="button" onClick={(event) => (event.currentTarget.nextElementSibling as HTMLInputElement | null)?.click()} className="mt-1 inline-flex items-center gap-2 rounded-lg border border-dashed border-[#b9cbbf] bg-[#f8fbf9] px-3 py-2 text-[10px] font-semibold text-[#3d7553] transition hover:border-[#78a087] hover:bg-[#f0f7f2]"><FileImage className="size-3.5" /> Inserir print neste ponto</button><input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => { addImage(index, event.target.files?.[0]); event.currentTarget.value = ''; }} /></div> : <figure key={block.key} className="overflow-hidden rounded-xl border border-[#dce5df] bg-[#f5f8f6]"><div className="relative bg-[linear-gradient(135deg,#edf2ef,#f9fbfa)] p-3"><img src={block.preview} alt={block.caption || 'Prévia do print inserido'} className="mx-auto max-h-72 rounded-lg object-contain shadow-sm" /><button type="button" onClick={() => removeImage(block.key)} className="absolute right-2 top-2 rounded-lg bg-white/95 px-2.5 py-1.5 text-[9px] font-semibold text-[#a44b3e] shadow-sm">Remover</button></div><input value={block.caption} onChange={(event) => onChange(blocks.map((entry) => entry.key === block.key && entry.type === 'image' ? { ...entry, caption: event.target.value } : entry))} className="w-full border-0 border-t border-[#e1e8e4] bg-white px-3 py-2 text-[10px] outline-none" placeholder="Legenda da imagem (opcional)" /></figure>)}</div></div>;
+}
+
+function ReportDescription({ value, attachments }: { value: string; attachments: ReportDetail['attachments'] }) {
+  let parsed: { version?: number; blocks?: Array<{ type?: string; value?: string; attachmentId?: string; caption?: string }> } | null = null;
+  try { parsed = JSON.parse(value); } catch { parsed = null; }
+  if (!parsed?.blocks || !Array.isArray(parsed.blocks)) return <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#3d4e45]">{value}</p>;
+  return <div className="mt-3 space-y-4">{parsed.blocks.map((block, index) => block.type === 'image' && block.attachmentId ? <figure key={`${block.attachmentId}-${index}`} className="overflow-hidden rounded-xl border border-[#dce5df] bg-[#f5f8f6]"><a href={`/api/attachments/${encodeURIComponent(block.attachmentId)}`} target="_blank" rel="noreferrer"><img src={`/api/attachments/${encodeURIComponent(block.attachmentId)}`} alt={block.caption || 'Print do erro'} className="max-h-[520px] w-full bg-[#edf2ef] object-contain" /></a>{block.caption && <figcaption className="border-t border-[#e1e8e4] bg-white px-3 py-2 text-[10px] text-[#68776f]">{block.caption}</figcaption>}</figure> : block.type === 'text' && block.value ? <p key={index} className="whitespace-pre-wrap text-sm leading-6 text-[#3d4e45]">{block.value}</p> : null)}{attachments.filter((file) => file.kind === 'inline').length === 0 && parsed.blocks.some((block) => block.type === 'image') && <p className="text-[10px] text-[#9a5a4f]">Uma imagem deste texto não está mais disponível.</p>}</div>;
+}
 
 function FormSection({ title, description, children }: { title: string; description: string; children: React.ReactNode }) { return <section className="space-y-4"><div><h3 className="text-sm font-semibold">{title}</h3><p className="mt-1 text-xs text-[#78867e]">{description}</p></div>{children}</section>; }
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block space-y-1.5 text-xs font-medium text-[#43564b]"><span>{label}</span>{children}</label>; }
