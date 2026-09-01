@@ -14,6 +14,11 @@ const reports = [
   { id: 'BUG-2026-008', title: 'Aviso de salas disponíveis', client: 'Controles · Recursos', copy: 'Validação do aviso', version: 'U+ 008/26', status: 'Corrigido', tone: 'green', owner: 'LS', updated: '30 jul, 14:20', attachments: 2 },
 ];
 type ReportItem = (typeof reports)[number];
+type ReportDetail = {
+  report: Record<string, string | number | null>;
+  attachments: Array<{ id: string; file_name: string; content_type: string; byte_size: number; kind: string; created_at: number }>;
+  activities: Array<{ id: string; actor_email: string; action: string; message: string | null; created_at: number }>;
+};
 
 const stats = [
   { label: 'Novos reports', value: '3', note: '1 urgente', icon: AlertTriangle, tone: 'red' },
@@ -40,11 +45,22 @@ export default function Home() {
   const [saved, setSaved] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ displayName: string; email: string } | null>(null);
   const [activeSection, setActiveSection] = useState<SectionId>('overview');
+  const [hasBackup, setHasBackup] = useState(true);
+  const [hasAttachments, setHasAttachments] = useState(true);
+  const [reportDetail, setReportDetail] = useState<ReportDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [replying, setReplying] = useState(false);
 
   useEffect(() => {
     fetch('/api/me')
       .then((response) => response.ok ? response.json() : null)
       .then((user) => user && setCurrentUser(user))
+      .catch(() => undefined);
+    fetch('/api/reports')
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload) => {
+        if (payload?.reports?.length) setReportItems(payload.reports.map(apiReportToItem));
+      })
       .catch(() => undefined);
   }, []);
 
@@ -68,16 +84,51 @@ export default function Home() {
         client: String(data.get('institution') || 'Cliente não informado'),
         copy: String(data.get('copy') || 'Sem cópia'),
         version: String(data.get('version') || 'Sem versão'),
-        status: 'Novo report', tone: 'red', owner: 'BD', updated: 'agora',
-        attachments: 1 + (data.getAll('screenshots').filter((file) => file instanceof File && file.size > 0).length),
+        status: 'Novo report', tone: 'red', owner: userInitials, updated: 'agora',
+        attachments: (hasBackup ? 1 : 0) + (hasAttachments ? data.getAll('screenshots').filter((file) => file instanceof File && file.size > 0).length : 0),
       }, ...current]);
       setSaved(true);
       form.reset();
+      setHasBackup(true);
+      setHasAttachments(true);
       window.setTimeout(() => { setNewReportOpen(false); setSaved(false); }, 900);
     } catch {
       alert('Não foi possível salvar o report. Confira o CSV e tente novamente.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function openReport(report: ReportItem) {
+    setSelectedReport(report);
+    setReportDetail(null);
+    setDetailLoading(true);
+    try {
+      const response = await fetch(`/api/reports/${encodeURIComponent(report.id)}`);
+      if (response.ok) setReportDetail(await response.json());
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
+  async function sendReply(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedReport) return;
+    setReplying(true);
+    const form = event.currentTarget;
+    try {
+      const response = await fetch(`/api/reports/${encodeURIComponent(selectedReport.id)}`, { method: 'POST', body: new FormData(form) });
+      if (!response.ok) throw new Error();
+      const payload = await response.json() as { status: string };
+      setReportItems((items) => items.map((item) => item.id === selectedReport.id ? { ...item, status: payload.status, tone: statusTone(payload.status), updated: 'agora' } : item));
+      setSelectedReport((current) => current ? { ...current, status: payload.status, tone: statusTone(payload.status), updated: 'agora' } : current);
+      form.reset();
+      const detailResponse = await fetch(`/api/reports/${encodeURIComponent(selectedReport.id)}`);
+      if (detailResponse.ok) setReportDetail(await detailResponse.json());
+    } catch {
+      alert('Não foi possível enviar a resposta. Tente novamente.');
+    } finally {
+      setReplying(false);
     }
   }
 
@@ -137,7 +188,7 @@ export default function Home() {
             </div>
             <div className="divide-y divide-[#e9eeeb]">
               {reportItems.map((report) => (
-                <button onClick={() => setSelectedReport(report)} key={report.id} className="group grid w-full grid-cols-[1fr_auto] items-center gap-4 px-5 py-4 text-left transition hover:bg-[#f8faf9] md:grid-cols-[minmax(270px,1.45fr)_minmax(140px,.7fr)_130px_110px_24px]">
+                <button onClick={() => openReport(report)} key={report.id} className="group grid w-full grid-cols-[1fr_auto] items-center gap-4 px-5 py-4 text-left transition hover:bg-[#f8faf9] md:grid-cols-[minmax(270px,1.45fr)_minmax(140px,.7fr)_130px_110px_24px]">
                   <div className="min-w-0"><div className="flex items-center gap-2"><span className="font-mono text-[10px] font-semibold text-[#7b8981]">{report.id}</span>{report.id === 'BUG-2026-014' && <Badge className="h-[18px] bg-[#fff0ed] px-1.5 text-[9px] font-semibold text-[#b64738]">URGENTE</Badge>}</div><p className="mt-1 truncate text-[13px] font-semibold text-[#1d2e25]">{report.title}</p><p className="mt-1 truncate text-[11px] text-[#75847c]">{report.client} · {report.copy}</p></div>
                   <div className="hidden md:block"><p className="text-[11px] font-medium text-[#3f5148]">{report.version}</p><div className="mt-1 flex items-center gap-1 text-[10px] text-[#849088]"><Paperclip className="size-3" />{report.attachments} anexos</div></div>
                   <div className="hidden md:block"><span className={`status status-${report.tone}`}><span />{report.status}</span></div>
@@ -157,7 +208,7 @@ export default function Home() {
             </section>
             <section className="rounded-2xl border border-[#dce5df] bg-[#173e2c] p-5 text-white"><FileArchive className="size-5 text-[#d7ff66]" /><h2 className="mt-4 text-[15px] font-semibold">Backup obrigatório</h2><p className="mt-1.5 text-xs leading-5 text-white/60">Todo novo report exige uma cópia de segurança em formato CSV.</p></section>
           </div>
-          </> : activeSection === 'reports' ? <ReportsView reports={reportItems} onSelect={setSelectedReport} onCreate={() => setNewReportOpen(true)} /> : activeSection === 'rounds' ? <RoundsView /> : activeSection === 'versions' ? <VersionsView /> : <TeamView currentUserName={currentUser?.displayName || userName} currentUserInitials={userInitials} />}
+          </> : activeSection === 'reports' ? <ReportsView reports={reportItems} onSelect={openReport} onCreate={() => setNewReportOpen(true)} /> : activeSection === 'rounds' ? <RoundsView /> : activeSection === 'versions' ? <VersionsView /> : <TeamView currentUserName={currentUser?.displayName || userName} currentUserInitials={userInitials} />}
         </div>
       </main>
 
@@ -180,11 +231,17 @@ export default function Home() {
                 <div className="grid gap-4 sm:grid-cols-3"><Field label="Ano letivo"><Input name="schoolYear" placeholder="2026" /></Field><Field label="Urgência"><select name="urgent" className="form-select"><option value="yes">Sim</option><option value="no">Não</option></select></Field><Field label="Ocorre no beta?"><select name="beta" className="form-select"><option>Não testado</option><option>Sim</option><option>Não</option></select></Field></div>
                 <Field label="Contorno encontrado"><Textarea name="workaround" placeholder="Não consegui fazer a reversão." /></Field>
               </FormSection>
-              <FormSection title="Anexos" description="A cópia de segurança CSV é obrigatória. Adicione também prints que ajudem o diagnóstico.">
-                <label className="upload-zone border-[#d5e2da] bg-[#f8fbf9]"><UploadCloud className="size-5 text-[#3b7755]" /><span><strong>Cópia de segurança (.csv) *</strong><small>Arquivo obrigatório para enviar o report</small></span><Input name="backup" type="file" accept=".csv,text/csv" required className="file-input" /></label>
-                <label className="upload-zone"><FileImage className="size-5 text-[#6b7d73]" /><span><strong>Prints do erro</strong><small>PNG, JPG ou WEBP · você pode selecionar vários</small></span><Input name="screenshots" type="file" accept="image/png,image/jpeg,image/webp" multiple className="file-input" /></label>
+              <FormSection title="Arquivos do report" description="Indique o que acompanha este chamado. As duas opções começam marcadas como Sim.">
+                <input type="hidden" name="hasBackup" value={hasBackup ? 'yes' : 'no'} />
+                <input type="hidden" name="hasAttachments" value={hasAttachments ? 'yes' : 'no'} />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <OptionToggle checked={hasBackup} onChange={setHasBackup} icon={FileArchive} title="Possui cópia de segurança?" description="Arquivo CSV do cliente" />
+                  <OptionToggle checked={hasAttachments} onChange={setHasAttachments} icon={FileImage} title="Possui anexos?" description="Prints ou imagens do erro" />
+                </div>
+                {hasBackup && <label className="upload-zone border-[#d5e2da] bg-[#f8fbf9]"><UploadCloud className="size-5 text-[#3b7755]" /><span><strong>Cópia de segurança (.csv) *</strong><small>Obrigatória enquanto “Possui cópia” estiver em Sim</small></span><Input name="backup" type="file" accept=".csv,text/csv" required className="file-input" /></label>}
+                {hasAttachments && <label className="upload-zone"><FileImage className="size-5 text-[#6b7d73]" /><span><strong>Prints do erro *</strong><small>PNG, JPG ou WEBP · selecione um ou mais arquivos</small></span><Input name="screenshots" type="file" accept="image/png,image/jpeg,image/webp" multiple required className="file-input" /></label>}
               </FormSection>
-              <label className="flex items-start gap-3 rounded-xl border border-[#dfe8e2] bg-[#f8fbf9] p-4 text-xs leading-5 text-[#52655a]"><input required type="checkbox" className="mt-1 accent-[#296444]" /><span>Confirmo que anexei a cópia de segurança e incluí as informações necessárias para reproduzir o problema.</span></label>
+              <label className="flex items-start gap-3 rounded-xl border border-[#dfe8e2] bg-[#f8fbf9] p-4 text-xs leading-5 text-[#52655a]"><input required type="checkbox" className="mt-1 accent-[#296444]" /><span>Confirmo que as informações acima representam corretamente o que acompanha este report.</span></label>
             </div>
             <DialogFooter className="mx-0 mb-0 px-6"><Button type="button" variant="outline" onClick={() => setNewReportOpen(false)}>Cancelar</Button><Button disabled={saving || saved} className="bg-[#173e2c] text-white hover:bg-[#24573f]">{saving ? <><LoaderCircle className="animate-spin" /> Salvando...</> : saved ? <><Check /> Report criado</> : 'Enviar para Desenvolvimento'}</Button></DialogFooter>
           </form>
@@ -196,20 +253,20 @@ export default function Home() {
           {selectedReport && <>
             <DialogHeader className="border-b border-[#e4ebe7] px-6 py-5">
               <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-[11px] font-semibold text-[#75847c]">{selectedReport.id}</span><span className={`status status-${selectedReport.tone}`}><span />{selectedReport.status}</span></div>
-              <DialogTitle className="mt-2 text-xl">{selectedReport.title}</DialogTitle><DialogDescription>{selectedReport.client} · Cópia {selectedReport.copy} · {selectedReport.version}</DialogDescription>
+              <DialogTitle className="mt-2 text-xl">{selectedReport.title}</DialogTitle><DialogDescription>{String(reportDetail?.report.institution || selectedReport.client)} · Cópia {String(reportDetail?.report.copy_number || selectedReport.copy)} · {String(reportDetail?.report.version || selectedReport.version)}</DialogDescription>
             </DialogHeader>
-            <div className="grid gap-6 px-6 py-5 md:grid-cols-[1fr_220px]">
+            {detailLoading && <div className="flex items-center justify-center gap-2 py-12 text-xs text-[#718078]"><LoaderCircle className="size-4 animate-spin" /> Carregando report...</div>}
+            {!detailLoading && <div className="grid gap-6 px-6 py-5 md:grid-cols-[1fr_220px]">
               <div className="space-y-5">
-                <div><p className="detail-label">Descrição do erro</p><p className="mt-2 text-sm leading-6 text-[#3d4e45]">Cliente tenta realizar a exportação para o RCO com todos os turnos e o sistema apresenta uma mensagem de erro, impedindo a conclusão.</p></div>
-                <div><p className="detail-label">Caminho</p><p className="mt-2 rounded-lg bg-[#f4f7f5] px-3 py-2 font-mono text-xs text-[#405449]">Sua Conta › Integração › Integração com a SEED-PR (RCO)</p></div>
+                <div><p className="detail-label">Descrição do erro</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#3d4e45]">{String(reportDetail?.report.description || 'Cliente tenta realizar a operação e o sistema apresenta um erro, impedindo a conclusão.')}</p></div>
+                <div><p className="detail-label">Caminho</p><p className="mt-2 rounded-lg bg-[#f4f7f5] px-3 py-2 font-mono text-xs text-[#405449]">{String(reportDetail?.report.system_path || 'Caminho informado no report')}</p></div>
                 <div><p className="detail-label">Linha do tempo</p><div className="mt-3 space-y-4 border-l border-[#dce5df] pl-5">
-                  <Timeline name="Jhoni Duarte" role="Suporte" time="Hoje, 16:35" text="Reportou o problema e anexou a cópia de segurança e o print do erro." />
-                  {selectedReport.status === 'Aguardando reteste' && <Timeline name="George Martins" role="Desenvolvimento" time="Hoje, 17:46" text="Fiz alterações referentes ao bug. Testem para verificar se foi corrigido." highlighted />}
+                  {reportDetail?.activities.length ? reportDetail.activities.map((activity) => <Timeline key={activity.id} name={actorName(activity.actor_email)} role={activity.action === 'status_update' ? 'Atualização de status' : activity.action === 'attachment_added' ? 'Anexo' : 'Equipe'} time={formatDateTime(activity.created_at)} text={activity.message || 'Atualização registrada.'} highlighted={activity.action === 'status_update'} />) : <Timeline name="Equipe GEHA" role="Suporte" time="Histórico inicial" text="Report registrado para análise da equipe." />}
                 </div></div>
-                <div className="rounded-xl border border-[#dce5df] p-3"><Textarea placeholder="Escreva uma resposta ou o resultado do reteste..." className="min-h-20 border-0 p-1 shadow-none focus-visible:ring-0" /><div className="mt-2 flex justify-between border-t border-[#edf1ef] pt-3"><Button variant="ghost" size="sm"><Paperclip /> Anexar</Button><Button size="sm" className="bg-[#173e2c] text-white"><MessageSquareText /> Responder</Button></div></div>
+                {reportDetail && <form onSubmit={sendReply} className="rounded-xl border border-[#dce5df] p-3"><Textarea name="message" placeholder="Escreva uma resposta ou o resultado do reteste..." className="min-h-20 border-0 p-1 shadow-none focus-visible:ring-0" /><div className="mt-2 grid gap-2 border-t border-[#edf1ef] pt-3 sm:grid-cols-[1fr_180px_auto]"><Input name="attachment" type="file" className="h-8 text-[10px]" aria-label="Anexar arquivo à resposta" /><select name="status" defaultValue={selectedReport.status} className="form-select"><option>Novo report</option><option>Em análise</option><option>Em correção</option><option>Aguardando reteste</option><option>Corrigido</option><option>Ainda ocorre</option></select><Button disabled={replying} size="sm" className="bg-[#173e2c] text-white">{replying ? <LoaderCircle className="animate-spin" /> : <MessageSquareText />} Responder</Button></div></form>}
               </div>
-              <aside className="space-y-4"><InfoCard label="Responsável" value="Desenvolvimento" /><InfoCard label="Urgência" value={selectedReport.id === 'BUG-2026-014' ? 'Sim — cliente bloqueado' : 'Normal'} /><InfoCard label="Ambiente beta" value="Não testado" /><div><p className="detail-label">Anexos</p><div className="mt-2 space-y-2"><Attachment name="backup-109279.csv" size="2,4 MB" csv /><Attachment name="erro-rco.png" size="184 KB" /></div></div></aside>
-            </div>
+              <aside className="space-y-4"><InfoCard label="Responsável" value="Desenvolvimento" /><InfoCard label="Urgência" value={Number(reportDetail?.report.urgent) === 1 ? 'Sim — prioritário' : 'Normal'} /><InfoCard label="Ambiente beta" value={String(reportDetail?.report.beta_status || 'Não testado')} />{reportDetail && <><InfoCard label="Possui cópia?" value={reportDetail.attachments.some((file) => file.kind === 'backup') ? 'Sim' : 'Não'} /><InfoCard label="Possui anexos?" value={reportDetail.attachments.some((file) => file.kind !== 'backup') ? 'Sim' : 'Não'} /></>}<div><p className="detail-label">Arquivos</p><div className="mt-2 space-y-2">{reportDetail?.attachments.length ? reportDetail.attachments.map((file) => <Attachment key={file.id} id={file.id} name={file.file_name} size={formatBytes(file.byte_size)} csv={file.kind === 'backup'} />) : <p className="rounded-lg bg-[#f4f7f5] p-3 text-[10px] text-[#7b8981]">Nenhum arquivo anexado.</p>}</div></div></aside>
+            </div>}
           </>}
         </DialogContent>
       </Dialog>
@@ -218,21 +275,29 @@ export default function Home() {
 }
 
 function ReportsView({ reports, onSelect, onCreate }: { reports: ReportItem[]; onSelect: (report: ReportItem) => void; onCreate: () => void }) {
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('Todos');
+  const filteredReports = reports.filter((report) => {
+    const haystack = `${report.id} ${report.title} ${report.client} ${report.copy} ${report.version}`.toLocaleLowerCase('pt-BR');
+    const matchesQuery = haystack.includes(query.toLocaleLowerCase('pt-BR'));
+    const matchesFilter = filter === 'Todos' || (filter === 'Novos' && report.status === 'Novo report') || (filter === 'Em andamento' && ['Em análise', 'Em correção', 'Em teste'].includes(report.status)) || (filter === 'Reteste' && report.status === 'Aguardando reteste') || (filter === 'Corrigidos' && report.status === 'Corrigido');
+    return matchesQuery && matchesFilter;
+  });
   return <div>
     <ViewHeading eyebrow="Central de chamados" title="Todos os reports" description="Acompanhe cada problema desde o envio do Suporte até o reteste final." action={<Button onClick={onCreate} className="bg-[#173e2c] text-white"><Plus /> Novo report</Button>} />
-    <div className="mt-6 grid gap-3 sm:grid-cols-3"><MiniStat value="14" label="Reports abertos" tone="red" /><MiniStat value="4" label="Aguardando reteste" tone="amber" /><MiniStat value="82%" label="Resolvidos no prazo" tone="green" /></div>
+    <div className="mt-6 grid gap-3 sm:grid-cols-3"><MiniStat value={String(reports.filter((report) => report.status !== 'Corrigido').length)} label="Reports abertos" tone="red" /><MiniStat value={String(reports.filter((report) => report.status === 'Aguardando reteste').length)} label="Aguardando reteste" tone="amber" /><MiniStat value={String(reports.filter((report) => report.status === 'Corrigido').length)} label="Reports corrigidos" tone="green" /></div>
     <section className="mt-5 overflow-hidden rounded-2xl border border-[#dce5df] bg-white">
       <div className="flex flex-col gap-3 border-b border-[#e4ebe7] p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-1.5">{['Todos', 'Novos', 'Em andamento', 'Reteste', 'Corrigidos'].map((filter, index) => <button key={filter} className={`rounded-lg px-3 py-1.5 text-[11px] font-medium ${index === 0 ? 'bg-[#173e2c] text-white' : 'bg-[#f0f4f1] text-[#64756b] hover:bg-[#e5ece7]'}`}>{filter}</button>)}</div>
-        <div className="relative sm:w-64"><Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[#849088]" /><Input placeholder="Buscar por cliente, função ou ID" aria-label="Buscar reports" className="h-9 rounded-xl bg-[#f8faf9] pl-8" /></div>
+        <div className="flex flex-wrap gap-1.5">{['Todos', 'Novos', 'Em andamento', 'Reteste', 'Corrigidos'].map((item) => <button onClick={() => setFilter(item)} key={item} className={`rounded-lg px-3 py-1.5 text-[11px] font-medium ${filter === item ? 'bg-[#173e2c] text-white' : 'bg-[#f0f4f1] text-[#64756b] hover:bg-[#e5ece7]'}`}>{item}</button>)}</div>
+        <div className="relative sm:w-64"><Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[#849088]" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por cliente, função ou ID" aria-label="Buscar reports" className="h-9 rounded-xl bg-[#f8faf9] pl-8" /></div>
       </div>
       <div className="hidden grid-cols-[1.4fr_.65fr_.6fr_.4fr] gap-4 border-b border-[#e9eeeb] bg-[#fafcfb] px-5 py-2.5 text-[9px] font-bold uppercase tracking-[.1em] text-[#829087] md:grid"><span>Report</span><span>Versão / anexos</span><span>Status</span><span>Responsável</span></div>
-      <div className="divide-y divide-[#e9eeeb]">{reports.map((report) => <button key={report.id} onClick={() => onSelect(report)} className="group grid w-full grid-cols-[1fr_auto] items-center gap-4 px-5 py-4 text-left hover:bg-[#f8faf9] md:grid-cols-[1.4fr_.65fr_.6fr_.4fr]">
+      <div className="divide-y divide-[#e9eeeb]">{filteredReports.map((report) => <button key={report.id} onClick={() => onSelect(report)} className="group grid w-full grid-cols-[1fr_auto] items-center gap-4 px-5 py-4 text-left hover:bg-[#f8faf9] md:grid-cols-[1.4fr_.65fr_.6fr_.4fr]">
         <div className="min-w-0"><div className="flex items-center gap-2"><span className="font-mono text-[10px] font-semibold text-[#78877f]">{report.id}</span>{report.id === 'BUG-2026-014' && <Badge className="h-[18px] bg-[#fff0ed] px-1.5 text-[9px] text-[#b64738]">URGENTE</Badge>}</div><p className="mt-1 truncate text-[13px] font-semibold">{report.title}</p><p className="mt-1 truncate text-[11px] text-[#75847c]">{report.client} · {report.copy}</p></div>
         <div className="hidden md:block"><p className="text-[11px] font-medium">{report.version}</p><p className="mt-1 flex items-center gap-1 text-[10px] text-[#849088]"><Paperclip className="size-3" />{report.attachments} anexos</p></div>
         <div className="hidden md:block"><span className={`status status-${report.tone}`}><span />{report.status}</span></div>
         <div className="flex items-center justify-end gap-2 md:justify-start"><span className="grid size-7 place-items-center rounded-full bg-[#e6ece8] text-[9px] font-semibold text-[#385144]">{report.owner}</span><ChevronRight className="size-4 text-[#a1ada6] transition group-hover:translate-x-0.5" /></div>
-      </button>)}</div>
+      </button>)}{filteredReports.length === 0 && <div className="py-14 text-center"><Search className="mx-auto size-5 text-[#9aa59f]" /><p className="mt-3 text-xs font-medium">Nenhum report encontrado</p><p className="mt-1 text-[10px] text-[#87938c]">Ajuste a busca ou selecione outro filtro.</p></div>}</div>
     </section>
   </div>;
 }
@@ -287,7 +352,8 @@ function FormSection({ title, description, children }: { title: string; descript
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block space-y-1.5 text-xs font-medium text-[#43564b]"><span>{label}</span>{children}</label>; }
 function Timeline({ name, role, time, text, highlighted = false }: { name: string; role: string; time: string; text: string; highlighted?: boolean }) { return <div className="relative"><span className={`absolute -left-[25px] top-1 size-2 rounded-full ring-4 ring-white ${highlighted ? 'bg-[#d79a27]' : 'bg-[#4b8b65]'}`} /><div className={highlighted ? 'rounded-xl border border-[#f0d69d] bg-[#fff9ed] p-3' : ''}><div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold">{name} <span className="font-normal text-[#849088]">· {role}</span></p><time className="text-[10px] text-[#8a968f]">{time}</time></div><p className="mt-1.5 text-xs leading-5 text-[#596960]">{text}</p></div></div>; }
 function InfoCard({ label, value }: { label: string; value: string }) { return <div><p className="detail-label">{label}</p><p className="mt-1.5 text-xs font-medium text-[#405248]">{value}</p></div>; }
-function Attachment({ name, size, csv = false }: { name: string; size: string; csv?: boolean }) { return <button className="flex w-full items-center gap-2 rounded-lg border border-[#e1e8e4] p-2 text-left hover:bg-[#f7faf8]"><span className={`grid size-8 place-items-center rounded-lg ${csv ? 'bg-[#eaf5ed] text-[#347850]' : 'bg-[#eef3f9] text-[#4b7097]'}`}>{csv ? <FileArchive className="size-4" /> : <FileImage className="size-4" />}</span><span className="min-w-0"><span className="block truncate text-[10px] font-semibold">{name}</span><span className="block text-[9px] text-[#8b978f]">{size}</span></span></button>; }
+function Attachment({ id, name, size, csv = false }: { id?: string; name: string; size: string; csv?: boolean }) { const content = <><span className={`grid size-8 place-items-center rounded-lg ${csv ? 'bg-[#eaf5ed] text-[#347850]' : 'bg-[#eef3f9] text-[#4b7097]'}`}>{csv ? <FileArchive className="size-4" /> : <FileImage className="size-4" />}</span><span className="min-w-0 flex-1"><span className="block truncate text-[10px] font-semibold">{name}</span><span className="block text-[9px] text-[#8b978f]">{size} · baixar</span></span></>; return id ? <a href={`/api/attachments/${encodeURIComponent(id)}`} className="flex w-full items-center gap-2 rounded-lg border border-[#e1e8e4] p-2 text-left hover:bg-[#f7faf8]">{content}</a> : <span className="flex w-full items-center gap-2 rounded-lg border border-[#e1e8e4] p-2 text-left">{content}</span>; }
+function OptionToggle({ checked, onChange, icon: Icon, title, description }: { checked: boolean; onChange: (value: boolean) => void; icon: typeof FileArchive; title: string; description: string }) { return <button type="button" onClick={() => onChange(!checked)} aria-pressed={checked} className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${checked ? 'border-[#9fc3ac] bg-[#f0f8f2]' : 'border-[#dce5df] bg-white'}`}><span className={`grid size-9 place-items-center rounded-lg ${checked ? 'bg-[#dceddf] text-[#347951]' : 'bg-[#f0f2f1] text-[#8b9690]'}`}><Icon className="size-4" /></span><span className="min-w-0 flex-1"><strong className="block text-xs font-semibold">{title}</strong><small className="mt-1 block text-[10px] text-[#7a8980]">{description}</small></span><span className={`relative h-5 w-9 rounded-full transition ${checked ? 'bg-[#347951]' : 'bg-[#cbd3ce]'}`}><span className={`absolute top-0.5 size-4 rounded-full bg-white shadow-sm transition ${checked ? 'left-[18px]' : 'left-0.5'}`} /></span><span className="sr-only">{checked ? 'Sim' : 'Não'}</span></button>; }
 function Dialog({ open, onOpenChange, children }: { open: boolean; onOpenChange: (open: boolean) => void; children: React.ReactNode }) { if (!open) return null; return <div className="fixed inset-0 z-50 grid place-items-center p-4"><button type="button" aria-label="Fechar janela" className="absolute inset-0 bg-[#0d1f17]/35 backdrop-blur-[2px]" onClick={() => onOpenChange(false)} /><div className="relative z-10 contents">{children}</div></div>; }
 function DialogContent({ className = '', children }: { className?: string; children: React.ReactNode }) { return <div role="dialog" aria-modal="true" className={`relative w-full rounded-2xl bg-white text-[#16231d] shadow-[0_25px_80px_rgb(5_20_12/28%)] ring-1 ring-black/5 ${className}`}>{children}</div>; }
 function DialogHeader({ className = '', children }: { className?: string; children: React.ReactNode }) { return <div className={className}>{children}</div>; }
@@ -304,3 +370,8 @@ function initials(name: string) {
   if (name === 'equipe') return 'EQ';
   return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 }
+function statusTone(status: string) { if (status === 'Corrigido') return 'green'; if (status === 'Aguardando reteste') return 'amber'; if (['Em análise', 'Em correção', 'Em teste'].includes(status)) return 'blue'; return 'red'; }
+function apiReportToItem(row: Record<string, unknown>): ReportItem { const email = String(row.author_email || 'EQ'); return { id: String(row.id), title: String(row.function_name || 'Report'), client: String(row.institution || 'Cliente não informado'), copy: String(row.copy_number || 'Sem cópia'), version: String(row.version || 'Sem versão'), status: String(row.status || 'Novo report'), tone: statusTone(String(row.status || 'Novo report')), owner: initials(email.includes('@') ? email.split('@')[0] : email).slice(0, 2), updated: formatDateTime(Number(row.updated_at || Date.now())), attachments: Number(row.attachment_count || 0) }; }
+function formatDateTime(value: number) { return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value)); }
+function actorName(email: string) { const local = email.split('@')[0].replace(/[._-]+/g, ' '); return local.replace(/\b\w/g, (letter) => letter.toUpperCase()); }
+function formatBytes(bytes: number) { if (bytes < 1024) return `${bytes} B`; if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`; return `${(bytes / 1024 / 1024).toFixed(1)} MB`; }

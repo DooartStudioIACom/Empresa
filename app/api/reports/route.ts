@@ -9,7 +9,7 @@ const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 export async function GET() {
   const user = await getChatGPTUser(); if (!user) return Response.json({ error: 'Não autenticado' }, { status: 401 });
   await ensureDatabase();
-  const result = await env.DB.prepare(`SELECT r.*, COUNT(a.id) AS attachment_count FROM reports r LEFT JOIN attachments a ON a.report_id = r.id GROUP BY r.id ORDER BY r.updated_at DESC LIMIT 100`).all();
+  const result = await env.DB.prepare(`SELECT r.id, r.function_name, r.institution, r.copy_number, r.version, r.status, r.urgent, r.author_email, r.updated_at, COUNT(a.id) AS attachment_count FROM reports r LEFT JOIN attachments a ON a.report_id = r.id GROUP BY r.id ORDER BY r.updated_at DESC LIMIT 100`).all();
   return Response.json({ reports: result.results });
 }
 
@@ -18,14 +18,18 @@ export async function POST(request: Request) {
   await ensureDatabase(); const data = await request.formData();
   const institution = value(data, 'institution'), functionName = value(data, 'function'), systemPath = value(data, 'path'), description = value(data, 'description');
   const backup = data.get('backup');
+  const hasBackup = value(data, 'hasBackup') === 'yes';
+  const hasAttachments = value(data, 'hasAttachments') === 'yes';
   if (!institution || !functionName || !systemPath || !description) return Response.json({ error: 'Campos obrigatórios ausentes' }, { status: 400 });
-  if (!(backup instanceof File) || backup.size === 0 || (!backup.name.toLowerCase().endsWith('.csv') && backup.type !== 'text/csv')) return Response.json({ error: 'A cópia de segurança CSV é obrigatória' }, { status: 400 });
-  if (backup.size > MAX_FILE_BYTES) return Response.json({ error: 'O CSV excede 10 MB' }, { status: 413 });
+  const backupFile = backup instanceof File && backup.size > 0 ? backup : null;
+  if (hasBackup && (!backupFile || (!backupFile.name.toLowerCase().endsWith('.csv') && backupFile.type !== 'text/csv'))) return Response.json({ error: 'Você marcou que possui cópia; anexe o arquivo CSV' }, { status: 400 });
+  if (backupFile && backupFile.size > MAX_FILE_BYTES) return Response.json({ error: 'O CSV excede 10 MB' }, { status: 413 });
   const screenshots = data.getAll('screenshots').filter((item): item is File => item instanceof File && item.size > 0);
+  if (hasAttachments && screenshots.length === 0) return Response.json({ error: 'Você marcou que possui anexos; selecione ao menos um print' }, { status: 400 });
   if (screenshots.some((file) => !IMAGE_TYPES.has(file.type) || file.size > MAX_FILE_BYTES)) return Response.json({ error: 'Print inválido ou maior que 10 MB' }, { status: 400 });
   const now = Date.now(), id = `BUG-${new Date(now).getFullYear()}-${String(now).slice(-5)}`, storedKeys: string[] = [];
   try {
-    const files = [{ file: backup, kind: 'backup' }, ...screenshots.map((file) => ({ file, kind: 'screenshot' }))];
+    const files = [...(hasBackup && backupFile ? [{ file: backupFile, kind: 'backup' }] : []), ...(hasAttachments ? screenshots.map((file) => ({ file, kind: 'screenshot' })) : [])];
     const rows: Array<{ id: string; key: string; file: File; kind: string }> = [];
     for (const { file, kind } of files) { const attachmentId = crypto.randomUUID(), key = `reports/${id}/${attachmentId}-${safeName(file.name)}`; await env.FILES.put(key, file.stream(), { httpMetadata: { contentType: file.type || 'application/octet-stream' } }); storedKeys.push(key); rows.push({ id: attachmentId, key, file, kind }); }
     await env.DB.batch([
