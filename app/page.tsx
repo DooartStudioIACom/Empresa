@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
-import { AlertTriangle, Bell, Bug, CalendarDays, Check, ChevronRight, CircleCheck, Clock3, FileArchive, FileImage, FlaskConical, LayoutDashboard, ListChecks, LoaderCircle, MessageSquareText, MoreHorizontal, Paperclip, Plus, Search, UploadCloud, Users } from 'lucide-react';
+import { AlertTriangle, Bell, Bug, CalendarDays, Check, CheckCircle2, ChevronRight, Circle, CircleCheck, Clock3, Code2, FileArchive, FileImage, FlaskConical, LayoutDashboard, ListChecks, LoaderCircle, MessageSquareText, MoreHorizontal, PackageCheck, Paperclip, PlayCircle, Plus, Search, ShieldCheck, UploadCloud, UserPlus, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ const reports = [
   { id: 'BUG-2026-012', title: 'Perfis de acesso — acesso total', client: 'Rodada interna de testes', copy: 'Gerenciar usuários', version: 'U+ 009/26', status: 'Aguardando reteste', tone: 'amber', owner: 'GM', updated: 'ontem, 17:46', attachments: 3 },
   { id: 'BUG-2026-008', title: 'Aviso de salas disponíveis', client: 'Controles · Recursos', copy: 'Validação do aviso', version: 'U+ 008/26', status: 'Corrigido', tone: 'green', owner: 'LS', updated: '30 jul, 14:20', attachments: 2 },
 ];
+type ReportItem = (typeof reports)[number];
 
 const stats = [
   { label: 'Novos reports', value: '3', note: '1 urgente', icon: AlertTriangle, tone: 'red' },
@@ -22,12 +23,14 @@ const stats = [
 ];
 
 const nav = [
-  { label: 'Visão geral', icon: LayoutDashboard, active: true },
-  { label: 'Reports', icon: Bug },
-  { label: 'Rodadas de testes', icon: ListChecks },
-  { label: 'Versões', icon: FileArchive },
-  { label: 'Equipe', icon: Users },
-];
+  { id: 'overview', label: 'Visão geral', icon: LayoutDashboard },
+  { id: 'reports', label: 'Reports', icon: Bug },
+  { id: 'rounds', label: 'Rodadas de testes', icon: ListChecks },
+  { id: 'versions', label: 'Versões', icon: FileArchive },
+  { id: 'team', label: 'Equipe', icon: Users },
+] as const;
+
+type SectionId = (typeof nav)[number]['id'];
 
 export default function Home() {
   const [reportItems, setReportItems] = useState(reports);
@@ -36,6 +39,7 @@ export default function Home() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ displayName: string; email: string } | null>(null);
+  const [activeSection, setActiveSection] = useState<SectionId>('overview');
 
   useEffect(() => {
     fetch('/api/me')
@@ -46,6 +50,7 @@ export default function Home() {
 
   const userName = friendlyName(currentUser?.displayName, currentUser?.email);
   const userInitials = initials(userName);
+  const pageTitle = activeSection === 'overview' ? `Olá, ${userName}` : nav.find((item) => item.id === activeSection)?.label;
 
   async function createReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -85,7 +90,7 @@ export default function Home() {
         </div>
         <nav className="flex-1 space-y-1 px-3 py-6" aria-label="Navegação principal">
           {nav.map((item) => { const Icon = item.icon; return (
-            <button key={item.label} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[13px] transition ${item.active ? 'bg-white/12 font-medium text-white' : 'text-white/60 hover:bg-white/7 hover:text-white'}`}>
+            <button onClick={() => setActiveSection(item.id)} key={item.label} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[13px] transition ${activeSection === item.id ? 'bg-white/12 font-medium text-white' : 'text-white/60 hover:bg-white/7 hover:text-white'}`}>
               <Icon className="size-[17px]" />{item.label}
             </button>
           ); })}
@@ -103,14 +108,19 @@ export default function Home() {
 
       <main className="lg:ml-[238px]">
         <header className="sticky top-0 z-10 flex h-[76px] items-center justify-between border-b border-[#dce5df] bg-[#f4f7f5]/90 px-5 backdrop-blur-xl sm:px-8">
-          <div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#607168]">Painel de qualidade</p><h1 className="mt-1 text-xl font-semibold tracking-[-0.025em]">Olá, {userName}</h1></div>
+          <div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#607168]">GEHA Resolve · Qualidade</p><h1 className="mt-1 text-xl font-semibold tracking-[-0.025em]">{pageTitle}</h1></div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon" aria-label="Notificações" className="relative size-9 rounded-xl bg-white"><Bell className="size-4" /><span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-[#ef6a5b] ring-2 ring-white" /></Button>
             <Button onClick={() => setNewReportOpen(true)} className="h-9 rounded-xl bg-[#173e2c] px-4 text-white shadow-sm hover:bg-[#24573f]"><Plus className="size-4" /> Novo report</Button>
           </div>
         </header>
 
+        <nav className="flex gap-1 overflow-x-auto border-b border-[#dce5df] bg-white px-4 py-2 lg:hidden" aria-label="Navegação principal móvel">
+          {nav.map((item) => { const Icon = item.icon; return <button onClick={() => setActiveSection(item.id)} key={item.id} className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium ${activeSection === item.id ? 'bg-[#eaf3ed] text-[#245b3d]' : 'text-[#6f7f76]'}`}><Icon className="size-3.5" />{item.label}</button>; })}
+        </nav>
+
         <div className="mx-auto max-w-[1420px] px-5 py-7 sm:px-8">
+          {activeSection === 'overview' ? <>
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Resumo dos chamados">
             {stats.map((stat) => { const Icon = stat.icon; return (
               <article key={stat.label} className="rounded-2xl border border-[#dce5df] bg-white p-4 shadow-[0_1px_2px_rgb(16_39_29/3%)]">
@@ -147,6 +157,7 @@ export default function Home() {
             </section>
             <section className="rounded-2xl border border-[#dce5df] bg-[#173e2c] p-5 text-white"><FileArchive className="size-5 text-[#d7ff66]" /><h2 className="mt-4 text-[15px] font-semibold">Backup obrigatório</h2><p className="mt-1.5 text-xs leading-5 text-white/60">Todo novo report exige uma cópia de segurança em formato CSV.</p></section>
           </div>
+          </> : activeSection === 'reports' ? <ReportsView reports={reportItems} onSelect={setSelectedReport} onCreate={() => setNewReportOpen(true)} /> : activeSection === 'rounds' ? <RoundsView /> : activeSection === 'versions' ? <VersionsView /> : <TeamView currentUserName={currentUser?.displayName || userName} currentUserInitials={userInitials} />}
         </div>
       </main>
 
@@ -205,6 +216,72 @@ export default function Home() {
     </div>
   );
 }
+
+function ReportsView({ reports, onSelect, onCreate }: { reports: ReportItem[]; onSelect: (report: ReportItem) => void; onCreate: () => void }) {
+  return <div>
+    <ViewHeading eyebrow="Central de chamados" title="Todos os reports" description="Acompanhe cada problema desde o envio do Suporte até o reteste final." action={<Button onClick={onCreate} className="bg-[#173e2c] text-white"><Plus /> Novo report</Button>} />
+    <div className="mt-6 grid gap-3 sm:grid-cols-3"><MiniStat value="14" label="Reports abertos" tone="red" /><MiniStat value="4" label="Aguardando reteste" tone="amber" /><MiniStat value="82%" label="Resolvidos no prazo" tone="green" /></div>
+    <section className="mt-5 overflow-hidden rounded-2xl border border-[#dce5df] bg-white">
+      <div className="flex flex-col gap-3 border-b border-[#e4ebe7] p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-1.5">{['Todos', 'Novos', 'Em andamento', 'Reteste', 'Corrigidos'].map((filter, index) => <button key={filter} className={`rounded-lg px-3 py-1.5 text-[11px] font-medium ${index === 0 ? 'bg-[#173e2c] text-white' : 'bg-[#f0f4f1] text-[#64756b] hover:bg-[#e5ece7]'}`}>{filter}</button>)}</div>
+        <div className="relative sm:w-64"><Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[#849088]" /><Input placeholder="Buscar por cliente, função ou ID" aria-label="Buscar reports" className="h-9 rounded-xl bg-[#f8faf9] pl-8" /></div>
+      </div>
+      <div className="hidden grid-cols-[1.4fr_.65fr_.6fr_.4fr] gap-4 border-b border-[#e9eeeb] bg-[#fafcfb] px-5 py-2.5 text-[9px] font-bold uppercase tracking-[.1em] text-[#829087] md:grid"><span>Report</span><span>Versão / anexos</span><span>Status</span><span>Responsável</span></div>
+      <div className="divide-y divide-[#e9eeeb]">{reports.map((report) => <button key={report.id} onClick={() => onSelect(report)} className="group grid w-full grid-cols-[1fr_auto] items-center gap-4 px-5 py-4 text-left hover:bg-[#f8faf9] md:grid-cols-[1.4fr_.65fr_.6fr_.4fr]">
+        <div className="min-w-0"><div className="flex items-center gap-2"><span className="font-mono text-[10px] font-semibold text-[#78877f]">{report.id}</span>{report.id === 'BUG-2026-014' && <Badge className="h-[18px] bg-[#fff0ed] px-1.5 text-[9px] text-[#b64738]">URGENTE</Badge>}</div><p className="mt-1 truncate text-[13px] font-semibold">{report.title}</p><p className="mt-1 truncate text-[11px] text-[#75847c]">{report.client} · {report.copy}</p></div>
+        <div className="hidden md:block"><p className="text-[11px] font-medium">{report.version}</p><p className="mt-1 flex items-center gap-1 text-[10px] text-[#849088]"><Paperclip className="size-3" />{report.attachments} anexos</p></div>
+        <div className="hidden md:block"><span className={`status status-${report.tone}`}><span />{report.status}</span></div>
+        <div className="flex items-center justify-end gap-2 md:justify-start"><span className="grid size-7 place-items-center rounded-full bg-[#e6ece8] text-[9px] font-semibold text-[#385144]">{report.owner}</span><ChevronRight className="size-4 text-[#a1ada6] transition group-hover:translate-x-0.5" /></div>
+      </button>)}</div>
+    </section>
+  </div>;
+}
+
+function RoundsView() {
+  const testItems = [
+    ['Perfis de acesso', 'Concluído', true], ['Recursos — aviso de salas', 'Concluído', true], ['Super Revisor', 'Em teste', false], ['Geminações — melhores horários', 'Aguardando', false], ['Tour do sistema', 'Concluído', true],
+  ] as const;
+  return <div>
+    <ViewHeading eyebrow="Planejamento de qualidade" title="Rodadas de testes" description="Organize o que precisa ser testado em cada entrega do U+." action={<Button className="bg-[#173e2c] text-white"><Plus /> Nova rodada</Button>} />
+    <div className="mt-6 grid gap-5 xl:grid-cols-[1.35fr_.65fr]">
+      <section className="overflow-hidden rounded-2xl border border-[#dce5df] bg-white">
+        <div className="border-b border-[#e4ebe7] bg-[#173e2c] p-5 text-white"><div className="flex items-start justify-between"><div><Badge className="bg-[#d7ff66] text-[#173e2c]">RODADA ATIVA</Badge><h2 className="mt-3 text-xl font-semibold">Testes U+ — 009/26</h2><p className="mt-1 text-xs text-white/55">Criada por Bruno Milfont · prazo 07/08</p></div><span className="grid size-10 place-items-center rounded-xl bg-white/10"><PlayCircle className="size-5 text-[#d7ff66]" /></span></div><div className="mt-5 flex items-center gap-3"><div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10"><div className="h-full w-[60%] bg-[#d7ff66]" /></div><span className="text-xs font-semibold">60%</span></div></div>
+        <div className="divide-y divide-[#e9eeeb]">{testItems.map(([label, status, done], index) => <button key={label} className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-[#f8faf9]"><span className={`grid size-7 place-items-center rounded-full ${done ? 'bg-[#e9f5ed] text-[#367a52]' : 'bg-[#f2f4f2] text-[#89958e]'}`}>{done ? <CheckCircle2 className="size-4" /> : <span className="text-[10px] font-semibold">{index + 1}</span>}</span><span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold">{label}</span><span className="mt-1 block text-[10px] text-[#849088]">Item {index + 1} de 5</span></span><span className={`text-[10px] font-semibold ${done ? 'text-[#3e8058]' : status === 'Em teste' ? 'text-[#3f72a2]' : 'text-[#8a958f]'}`}>{status}</span><ChevronRight className="size-4 text-[#a6b0aa]" /></button>)}</div>
+      </section>
+      <div className="space-y-4"><InfoPanel icon={CalendarDays} title="Prazo da rodada" value="Sexta-feira, 07/08" note="5 itens · 3 concluídos" /><InfoPanel icon={Bug} title="Bugs encontrados" value="3 reports" note="1 corrigido · 2 em andamento" /><section className="rounded-2xl border border-[#dce5df] bg-white p-5"><p className="detail-label">Rodadas anteriores</p>{[['U+ 008/26','Concluída','30/07'],['U+ 007/26','Concluída','17/07'],['U+ 006/26','Arquivada','03/07']].map(([name,status,date]) => <button key={name} className="mt-3 flex w-full items-center gap-3 border-b border-[#edf1ef] pb-3 text-left last:border-0 last:pb-0"><PackageCheck className="size-4 text-[#56806a]" /><span className="flex-1 text-xs font-semibold">{name}</span><span className="text-[10px] text-[#849088]">{status} · {date}</span></button>)}</section></div>
+    </div>
+  </div>;
+}
+
+function VersionsView() {
+  const versions = [
+    { name: 'U+ 009/26', date: '03 ago 2026', status: 'Em testes', tone: 'blue', reports: '3 reports', notes: 'Super Revisor, perfis de acesso, aviso de recursos e melhorias de usabilidade.' },
+    { name: 'U+ 008/26', date: '30 jul 2026', status: 'Aprovada', tone: 'green', reports: '2 corrigidos', notes: 'Ajustes em Controles e melhorias na validação de salas.' },
+    { name: 'U+ 007/26', date: '17 jul 2026', status: 'Publicada', tone: 'green', reports: 'Sem pendências', notes: 'Correções gerais e melhorias de estabilidade.' },
+    { name: 'U+ 006/26', date: '03 jul 2026', status: 'Arquivada', tone: 'amber', reports: '4 corrigidos', notes: 'Ciclo encerrado e histórico preservado.' },
+  ];
+  return <div><ViewHeading eyebrow="Histórico de entregas" title="Versões do U+" description="Veja o que mudou, os testes executados e os bugs relacionados a cada versão." action={<Button variant="outline"><Plus /> Registrar versão</Button>} />
+    <div className="mt-6 grid gap-3 sm:grid-cols-3"><MiniStat value="009/26" label="Versão em testes" tone="blue" /><MiniStat value="8" label="Versões em 2026" tone="green" /><MiniStat value="3" label="Pendências atuais" tone="amber" /></div>
+    <section className="mt-5 overflow-hidden rounded-2xl border border-[#dce5df] bg-white"><div className="border-b border-[#e4ebe7] px-5 py-4"><h2 className="text-sm font-semibold">Linha do tempo de versões</h2><p className="mt-1 text-xs text-[#78867e]">Da versão mais recente para a mais antiga</p></div><div className="divide-y divide-[#e9eeeb]">{versions.map((version, index) => <button key={version.name} className="grid w-full gap-3 px-5 py-5 text-left hover:bg-[#f8faf9] md:grid-cols-[55px_150px_1fr_120px_20px] md:items-center"><span className="relative grid size-10 place-items-center rounded-xl bg-[#eef4f0] text-[#3f6d54]"><Code2 className="size-4" />{index < versions.length - 1 && <span className="absolute left-1/2 top-10 hidden h-8 w-px bg-[#dce5df] md:block" />}</span><span><span className="block text-sm font-semibold">{version.name}</span><span className="mt-1 block text-[10px] text-[#849088]">{version.date}</span></span><span className="text-xs leading-5 text-[#5f7067]">{version.notes}</span><span><span className={`status status-${version.tone}`}><span />{version.status}</span><small className="mt-1.5 block text-[9px] text-[#89958e]">{version.reports}</small></span><ChevronRight className="size-4 text-[#a2ada7]" /></button>)}</div></section>
+  </div>;
+}
+
+function TeamView({ currentUserName, currentUserInitials }: { currentUserName: string; currentUserInitials: string }) {
+  const members = [
+    { name: currentUserName, role: 'Qualidade', initials: currentUserInitials, open: 4, color: '#d7ff66', current: true },
+    { name: 'Bruno Milfont', role: 'Gerência', initials: 'BM', open: 3, color: '#dce8ff' },
+    { name: 'George Martins', role: 'Desenvolvimento', initials: 'GM', open: 5, color: '#ffe5c9' },
+    { name: 'Jhoni Duarte', role: 'Suporte', initials: 'JD', open: 2, color: '#eadfff' },
+  ];
+  return <div><ViewHeading eyebrow="Pessoas e responsabilidades" title="Equipe" description="Acompanhe quem reporta, corrige, testa e aprova cada chamado." action={<Button variant="outline"><UserPlus /> Adicionar pessoa</Button>} />
+    <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{members.map((member) => <article key={member.name} className="rounded-2xl border border-[#dce5df] bg-white p-5"><div className="flex items-start justify-between"><span style={{ background: member.color }} className="grid size-11 place-items-center rounded-full text-xs font-bold text-[#294033]">{member.initials}</span>{member.current && <Badge className="bg-[#edf7f0] text-[#377853]">VOCÊ</Badge>}</div><h2 className="mt-4 text-sm font-semibold">{member.name}</h2><p className="mt-1 text-xs text-[#78867e]">{member.role}</p><div className="mt-4 flex items-center justify-between border-t border-[#edf1ef] pt-4"><span className="text-[10px] text-[#849088]">Chamados ativos</span><span className="text-sm font-semibold">{member.open}</span></div></article>)}</div>
+    <section className="mt-5 rounded-2xl border border-[#dce5df] bg-white p-5"><div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-xl bg-[#edf5f0] text-[#397657]"><ShieldCheck className="size-4" /></span><div><h2 className="text-sm font-semibold">Papéis no fluxo</h2><p className="mt-1 text-xs text-[#78867e]">Cada área participa em uma etapa clara do chamado.</p></div></div><div className="mt-5 grid gap-3 md:grid-cols-4">{[['Suporte','Registra o problema'],['Gerência','Prioriza e acompanha'],['Desenvolvimento','Analisa e corrige'],['Qualidade','Testa e encerra']].map(([role,description], index) => <div key={role} className="relative rounded-xl bg-[#f6f9f7] p-4"><span className="text-[10px] font-bold text-[#3e7657]">0{index + 1}</span><p className="mt-2 text-xs font-semibold">{role}</p><p className="mt-1 text-[10px] text-[#7c8a82]">{description}</p></div>)}</div></section>
+  </div>;
+}
+
+function ViewHeading({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action: React.ReactNode }) { return <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[.13em] text-[#4f7b62]">{eyebrow}</p><h2 className="mt-2 text-2xl font-semibold tracking-[-.035em]">{title}</h2><p className="mt-1.5 max-w-2xl text-sm text-[#708078]">{description}</p></div>{action}</div>; }
+function MiniStat({ value, label, tone }: { value: string; label: string; tone: string }) { return <article className="rounded-2xl border border-[#dce5df] bg-white p-4"><div className={`mb-3 h-1 w-9 rounded-full stat-${tone}`} /><p className="text-xl font-semibold tracking-[-.03em]">{value}</p><p className="mt-1 text-[11px] text-[#78867e]">{label}</p></article>; }
+function InfoPanel({ icon: Icon, title, value, note }: { icon: typeof CalendarDays; title: string; value: string; note: string }) { return <section className="rounded-2xl border border-[#dce5df] bg-white p-5"><div className="flex items-start gap-3"><span className="grid size-9 place-items-center rounded-xl bg-[#eef5f0] text-[#3b7655]"><Icon className="size-4" /></span><div><p className="text-[10px] font-medium text-[#7b8981]">{title}</p><p className="mt-1 text-sm font-semibold">{value}</p><p className="mt-1 text-[10px] text-[#87938c]">{note}</p></div></div></section>; }
 
 function FormSection({ title, description, children }: { title: string; description: string; children: React.ReactNode }) { return <section className="space-y-4"><div><h3 className="text-sm font-semibold">{title}</h3><p className="mt-1 text-xs text-[#78867e]">{description}</p></div>{children}</section>; }
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block space-y-1.5 text-xs font-medium text-[#43564b]"><span>{label}</span>{children}</label>; }
