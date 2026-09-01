@@ -49,6 +49,10 @@ export default function Home() {
   const [activeSection, setActiveSection] = useState<SectionId>('overview');
   const [hasBackup, setHasBackup] = useState(true);
   const [hasAttachments, setHasAttachments] = useState(true);
+  const [fromTestRound, setFromTestRound] = useState(false);
+  const [reportRounds, setReportRounds] = useState<TestRound[]>([]);
+  const [linkedRoundId, setLinkedRoundId] = useState('');
+  const [linkedItemId, setLinkedItemId] = useState('');
   const [reportDetail, setReportDetail] = useState<ReportDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [replying, setReplying] = useState(false);
@@ -67,7 +71,7 @@ export default function Home() {
       const [reportResponse, roundResponse] = await Promise.allSettled([fetch('/api/reports'), fetch('/api/rounds')]);
       let synced = false;
       if (reportResponse.status === 'fulfilled' && reportResponse.value.ok) { const payload = await reportResponse.value.json(); setReportItems((payload.reports || []).map(apiReportToItem)); synced = true; }
-      if (roundResponse.status === 'fulfilled' && roundResponse.value.ok) { const payload = await roundResponse.value.json() as { rounds?: TestRound[] }; setOverviewRound(payload.rounds?.find((round) => round.status === 'Em andamento') || payload.rounds?.[0] || null); synced = true; }
+      if (roundResponse.status === 'fulfilled' && roundResponse.value.ok) { const payload = await roundResponse.value.json() as { rounds?: TestRound[] }; const loadedRounds = payload.rounds || []; setReportRounds(loadedRounds); setOverviewRound(loadedRounds.find((round) => round.status === 'Em andamento') || loadedRounds[0] || null); synced = true; }
       if (synced) setLastSync(new Date());
     };
     void syncDashboard();
@@ -75,6 +79,11 @@ export default function Home() {
     const tipTimer = window.setInterval(() => setTipIndex((current) => (current + 1) % qualityTips.length), 7000);
     return () => { window.clearInterval(syncTimer); window.clearInterval(tipTimer); };
   }, []);
+
+  useEffect(() => {
+    if (!newReportOpen) return;
+    fetch('/api/rounds').then((response) => response.ok ? response.json() : null).then((payload: { rounds?: TestRound[] } | null) => payload?.rounds && setReportRounds(payload.rounds)).catch(() => undefined);
+  }, [newReportOpen]);
 
   const userName = friendlyName(currentUser?.displayName, currentUser?.email);
   const userInitials = initials(userName);
@@ -87,6 +96,7 @@ export default function Home() {
   ];
   const overviewTested = overviewRound?.items.filter((item) => ['Aprovado', 'Com bug'].includes(item.status)).length || 0;
   const overviewProgress = overviewRound?.items.length ? Math.round((overviewTested / overviewRound.items.length) * 100) : 0;
+  const linkedRound = reportRounds.find((round) => round.id === linkedRoundId) || null;
 
   async function createReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -121,6 +131,9 @@ export default function Home() {
       form.reset();
       setHasBackup(true);
       setHasAttachments(true);
+      setFromTestRound(false);
+      setLinkedRoundId('');
+      setLinkedItemId('');
       window.setTimeout(() => { setNewReportOpen(false); setSaved(false); }, 900);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Não foi possível salvar o report. Tente novamente.');
@@ -266,8 +279,13 @@ export default function Home() {
             </DialogHeader>
             {formError && <div role="alert" className="mx-6 mt-5 flex items-start gap-2 rounded-xl border border-[#efc3bb] bg-[#fff2ef] p-3 text-xs leading-5 text-[#9e3e31]"><AlertTriangle className="mt-0.5 size-4 shrink-0" /><span>{formError}</span></div>}
             <div className="space-y-6 px-6 py-5">
+              <FormSection title="Origem do report" description="Informe se este problema foi encontrado durante uma rodada de testes.">
+                <input type="hidden" name="fromTestRound" value={fromTestRound ? 'yes' : 'no'} />
+                <label className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${fromTestRound ? 'border-[#83ad91] bg-[#f0f8f2] shadow-[0_8px_24px_-22px_#173e2c]' : 'border-[#dfe7e2] bg-[#fafcfb] hover:border-[#b9ccbf]'}`}><input type="checkbox" checked={fromTestRound} onChange={(event) => { setFromTestRound(event.target.checked); if (!event.target.checked) { setLinkedRoundId(''); setLinkedItemId(''); } }} className="mt-1 size-4 accent-[#296444]" /><span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white text-[#397657] shadow-sm"><ListChecks className="size-4" /></span><span><strong className="block text-xs font-semibold text-[#34483d]">Bug encontrado em uma rodada de testes</strong><small className="mt-1 block text-[10px] leading-4 text-[#75847c]">Marque para relacionar este report à rodada e ao teste onde o problema apareceu.</small></span></label>
+                {fromTestRound && <div className="rounded-2xl border border-[#cfe0d5] bg-white p-4"><div className="flex items-center gap-2 border-b border-[#edf1ef] pb-3"><span className="grid size-7 place-items-center rounded-lg bg-[#d7ff66] text-[#244c35]"><PackageCheck className="size-3.5" /></span><div><p className="text-xs font-semibold">Vincular à rodada</p><p className="text-[9px] text-[#849088]">Essas informações aparecerão no histórico do report.</p></div></div><div className="mt-4 grid gap-4 sm:grid-cols-2"><Field label="Nome da rodada"><select name="testRoundId" required value={linkedRoundId} onChange={(event) => { setLinkedRoundId(event.target.value); setLinkedItemId(''); }} className="form-select"><option value="">Selecione a rodada</option>{reportRounds.map((round) => <option key={round.id} value={round.id}>{round.title}</option>)}</select></Field><Field label="Número / versão"><Input value={linkedRound?.version || ''} readOnly placeholder="Preenchido pela rodada" className="bg-[#f5f8f6]" /></Field></div><div className="mt-4"><Field label="Nome do teste onde encontrou o bug"><select name="testItemId" required value={linkedItemId} onChange={(event) => setLinkedItemId(event.target.value)} disabled={!linkedRound} className="form-select"><option value="">{linkedRound ? 'Selecione o teste' : 'Primeiro selecione a rodada'}</option>{linkedRound?.items.map((item) => <option key={item.id} value={item.id}>{item.position}. {item.title}</option>)}</select></Field></div>{reportRounds.length === 0 && <p className="mt-3 rounded-lg bg-[#fff7e4] px-3 py-2 text-[10px] text-[#8a641b]">Nenhuma rodada está disponível. Cadastre uma rodada antes de vincular o report.</p>}</div>}
+              </FormSection>
               <FormSection title="Dados do cliente" description="Preencha quando o problema estiver ligado a uma instituição.">
-                <Field label="Instituição"><Input name="institution" required placeholder="Ex.: Colégio Estadual Ivo Leão" /></Field>
+                <Field label={fromTestRound ? 'Instituição (opcional para rodada interna)' : 'Instituição'}><Input name="institution" required={!fromTestRound} placeholder={fromTestRound ? 'Será identificado como Rodada interna de testes' : 'Ex.: Colégio Estadual Ivo Leão'} /></Field>
                 <div className="grid gap-4 sm:grid-cols-3"><Field label="Cidade/UF"><Input name="city" placeholder="Curitiba/PR" /></Field><Field label="Cópia"><Input name="copy" placeholder="109279" /></Field><Field label="INEP"><Input name="inep" placeholder="41129970" /></Field></div>
                 <div className="grid gap-4 sm:grid-cols-2"><Field label="Nome do cliente"><Input name="clientName" /></Field><Field label="Telefone"><Input name="phone" /></Field></div>
               </FormSection>
@@ -312,7 +330,7 @@ export default function Home() {
                 </div></div>
                 {reportDetail && <form onSubmit={sendReply} className="rounded-xl border border-[#dce5df] p-3"><Textarea name="message" placeholder="Escreva uma resposta ou o resultado do reteste..." className="min-h-20 border-0 p-1 shadow-none focus-visible:ring-0" /><div className="mt-2 grid gap-2 border-t border-[#edf1ef] pt-3 sm:grid-cols-[1fr_180px_auto]"><Input name="attachment" type="file" className="h-8 text-[10px]" aria-label="Anexar arquivo à resposta" /><select name="status" defaultValue={selectedReport.status} className="form-select"><option>Novo report</option><option>Em análise</option><option>Em correção</option><option>Aguardando reteste</option><option>Corrigido</option><option>Ainda ocorre</option></select><Button type="submit" disabled={replying} size="sm" className="bg-[#173e2c] text-white">{replying ? <LoaderCircle className="animate-spin" /> : <MessageSquareText />} {replying ? 'Enviando...' : 'Responder'}</Button></div>{replyNotice && <div role="status" className={`mt-3 rounded-lg border px-3 py-2 text-[11px] ${replyNotice.tone === 'success' ? 'border-[#bfddc9] bg-[#eef8f1] text-[#2f7048]' : 'border-[#efc3bb] bg-[#fff2ef] text-[#9e3e31]'}`}>{replyNotice.message}</div>}</form>}
               </div>
-              <aside className="space-y-4"><InfoCard label="Responsável" value="Desenvolvimento" /><InfoCard label="Urgência" value={Number(reportDetail?.report.urgent) === 1 ? 'Sim — prioritário' : 'Normal'} /><InfoCard label="Ambiente beta" value={String(reportDetail?.report.beta_status || 'Não testado')} />{reportDetail && <><InfoCard label="Possui cópia?" value={reportDetail.attachments.some((file) => file.kind === 'backup') ? 'Sim' : 'Não'} /><InfoCard label="Possui anexos?" value={reportDetail.attachments.some((file) => file.kind !== 'backup') ? 'Sim' : 'Não'} /></>}<div><p className="detail-label">Arquivos</p><div className="mt-2 space-y-2">{reportDetail?.attachments.length ? reportDetail.attachments.map((file) => <Attachment key={file.id} id={file.id} name={file.file_name} size={formatBytes(file.byte_size)} csv={file.kind === 'backup'} />) : <p className="rounded-lg bg-[#f4f7f5] p-3 text-[10px] text-[#7b8981]">Nenhum arquivo anexado.</p>}</div></div></aside>
+              <aside className="space-y-4">{Number(reportDetail?.report.from_test_round) === 1 && <section className="rounded-xl border border-[#cfe0d5] bg-[#f2f8f4] p-4"><div className="flex items-center gap-2"><ListChecks className="size-4 text-[#397657]" /><p className="detail-label text-[#397657]">Bug de rodada</p></div><p className="mt-3 text-xs font-semibold">{String(reportDetail?.report.test_round_title || '')}</p><p className="mt-1 text-[10px] text-[#718078]">{String(reportDetail?.report.test_round_version || '')}</p><div className="mt-3 rounded-lg bg-white px-3 py-2"><p className="text-[9px] font-semibold uppercase text-[#849088]">Teste relacionado</p><p className="mt-1 text-[10px] font-semibold text-[#405449]">{String(reportDetail?.report.test_item_title || '')}</p></div></section>}<InfoCard label="Responsável" value="Desenvolvimento" /><InfoCard label="Urgência" value={Number(reportDetail?.report.urgent) === 1 ? 'Sim — prioritário' : 'Normal'} /><InfoCard label="Ambiente beta" value={String(reportDetail?.report.beta_status || 'Não testado')} />{reportDetail && <><InfoCard label="Possui cópia?" value={reportDetail.attachments.some((file) => file.kind === 'backup') ? 'Sim' : 'Não'} /><InfoCard label="Possui anexos?" value={reportDetail.attachments.some((file) => file.kind !== 'backup') ? 'Sim' : 'Não'} /></>}<div><p className="detail-label">Arquivos</p><div className="mt-2 space-y-2">{reportDetail?.attachments.length ? reportDetail.attachments.map((file) => <Attachment key={file.id} id={file.id} name={file.file_name} size={formatBytes(file.byte_size)} csv={file.kind === 'backup'} />) : <p className="rounded-lg bg-[#f4f7f5] p-3 text-[10px] text-[#7b8981]">Nenhum arquivo anexado.</p>}</div></div></aside>
             </div>}
           </>}
         </DialogContent>
