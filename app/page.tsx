@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { AlertTriangle, Bell, Bug, CalendarDays, Check, ChevronRight, CircleCheck, Clock3, FileArchive, FileImage, FlaskConical, LayoutDashboard, ListChecks, LoaderCircle, MessageSquareText, MoreHorizontal, Paperclip, Plus, Search, UploadCloud, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,17 @@ export default function Home() {
   const [selectedReport, setSelectedReport] = useState<(typeof reports)[number] | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ displayName: string; email: string } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/me')
+      .then((response) => response.ok ? response.json() : null)
+      .then((user) => user && setCurrentUser(user))
+      .catch(() => undefined);
+  }, []);
+
+  const userName = friendlyName(currentUser?.displayName, currentUser?.email);
+  const userInitials = initials(userName);
 
   async function createReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -85,14 +96,14 @@ export default function Home() {
           <div className="mt-2 flex justify-between text-[11px] text-white/50"><span>5 itens</span><span>62%</span></div>
         </div>
         <button className="flex items-center gap-3 border-t border-white/10 px-5 py-5 text-left">
-          <span className="grid size-8 place-items-center rounded-full bg-[#e7b68d] text-xs font-semibold text-[#4a2a14]">BD</span>
-          <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium">Brian Duarte</span><span className="block text-[10px] text-white/45">Qualidade</span></span><MoreHorizontal className="size-4 text-white/40" />
+          <span className="grid size-8 place-items-center rounded-full bg-[#e7b68d] text-xs font-semibold text-[#4a2a14]">{userInitials}</span>
+          <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium">{currentUser?.displayName || 'Usuário conectado'}</span><span className="block text-[10px] text-white/45">Membro da equipe</span></span><MoreHorizontal className="size-4 text-white/40" />
         </button>
       </aside>
 
       <main className="lg:ml-[238px]">
         <header className="sticky top-0 z-10 flex h-[76px] items-center justify-between border-b border-[#dce5df] bg-[#f4f7f5]/90 px-5 backdrop-blur-xl sm:px-8">
-          <div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#607168]">Segunda-feira, 3 de agosto</p><h1 className="mt-1 text-xl font-semibold tracking-[-0.025em]">Bom dia, Brian</h1></div>
+          <div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#607168]">Painel de qualidade</p><h1 className="mt-1 text-xl font-semibold tracking-[-0.025em]">Olá, {userName}</h1></div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon" aria-label="Notificações" className="relative size-9 rounded-xl bg-white"><Bell className="size-4" /><span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-[#ef6a5b] ring-2 ring-white" /></Button>
             <Button onClick={() => setNewReportOpen(true)} className="h-9 rounded-xl bg-[#173e2c] px-4 text-white shadow-sm hover:bg-[#24573f]"><Plus className="size-4" /> Novo report</Button>
@@ -206,3 +217,13 @@ function DialogHeader({ className = '', children }: { className?: string; childr
 function DialogTitle({ className = '', children }: { className?: string; children: React.ReactNode }) { return <h2 className={`font-semibold tracking-[-0.02em] ${className}`}>{children}</h2>; }
 function DialogDescription({ className = '', children }: { className?: string; children: React.ReactNode }) { return <p className={`text-sm text-[#718078] ${className}`}>{children}</p>; }
 function DialogFooter({ className = '', children }: { className?: string; children: React.ReactNode }) { return <div className={`flex flex-col-reverse gap-2 border-t border-[#e4ebe7] bg-[#f8faf9] py-4 sm:flex-row sm:justify-end ${className}`}>{children}</div>; }
+function friendlyName(displayName?: string, email?: string) {
+  const candidate = displayName || email;
+  if (!candidate) return 'equipe';
+  const clean = candidate.includes('@') ? candidate.split('@')[0] : candidate;
+  return clean.trim().split(/\s+/)[0] || 'equipe';
+}
+function initials(name: string) {
+  if (name === 'equipe') return 'EQ';
+  return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+}
