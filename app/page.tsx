@@ -22,11 +22,10 @@ type ReportDetail = {
 type TestRoundItem = { id: string; round_id: string; position: number; title: string; path: string | null; description: string | null; status: string; tester_email: string | null; result_note: string | null; updated_at: number };
 type TestRound = { id: string; title: string; version: string; deadline: string; description: string | null; status: string; author_email: string; created_at: number; updated_at: number; items: TestRoundItem[] };
 
-const stats = [
-  { label: 'Novos reports', value: '3', note: '1 urgente', icon: AlertTriangle, tone: 'red' },
-  { label: 'Em andamento', value: '7', note: '2 com DEV', icon: Clock3, tone: 'blue' },
-  { label: 'Para retestar', value: '4', note: 'aguardando equipe', icon: FlaskConical, tone: 'amber' },
-  { label: 'Corrigidos', value: '18', note: 'neste ciclo', icon: CircleCheck, tone: 'green' },
+const qualityTips = [
+  'Antes de reportar, registre o caminho exato e tente repetir o erro uma segunda vez.',
+  'Ao retestar, confira também o fluxo vizinho: uma correção pode afetar telas relacionadas.',
+  'Prints com contexto e uma cópia atualizada reduzem o tempo de análise do Desenvolvimento.',
 ];
 
 const nav = [
@@ -54,23 +53,39 @@ export default function Home() {
   const [replying, setReplying] = useState(false);
   const [replyNotice, setReplyNotice] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [overviewRound, setOverviewRound] = useState<TestRound | null>(null);
+  const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [tipIndex, setTipIndex] = useState(0);
 
   useEffect(() => {
     fetch('/api/me')
       .then((response) => response.ok ? response.json() : null)
       .then((user) => user && setCurrentUser(user))
       .catch(() => undefined);
-    fetch('/api/reports')
-      .then((response) => response.ok ? response.json() : null)
-      .then((payload) => {
-        if (payload?.reports?.length) setReportItems(payload.reports.map(apiReportToItem));
-      })
-      .catch(() => undefined);
+    const syncDashboard = async () => {
+      const [reportResponse, roundResponse] = await Promise.allSettled([fetch('/api/reports'), fetch('/api/rounds')]);
+      let synced = false;
+      if (reportResponse.status === 'fulfilled' && reportResponse.value.ok) { const payload = await reportResponse.value.json(); setReportItems((payload.reports || []).map(apiReportToItem)); synced = true; }
+      if (roundResponse.status === 'fulfilled' && roundResponse.value.ok) { const payload = await roundResponse.value.json() as { rounds?: TestRound[] }; setOverviewRound(payload.rounds?.find((round) => round.status === 'Em andamento') || payload.rounds?.[0] || null); synced = true; }
+      if (synced) setLastSync(new Date());
+    };
+    void syncDashboard();
+    const syncTimer = window.setInterval(syncDashboard, 15000);
+    const tipTimer = window.setInterval(() => setTipIndex((current) => (current + 1) % qualityTips.length), 7000);
+    return () => { window.clearInterval(syncTimer); window.clearInterval(tipTimer); };
   }, []);
 
   const userName = friendlyName(currentUser?.displayName, currentUser?.email);
   const userInitials = initials(userName);
   const pageTitle = activeSection === 'overview' ? `Olá, ${userName}` : nav.find((item) => item.id === activeSection)?.label;
+  const dashboardStats = [
+    { label: 'Novos reports', value: String(reportItems.filter((item) => item.status === 'Novo report').length), note: `${reportItems.filter((item) => item.status === 'Novo report' && item.id.startsWith('BUG')).length} aguardando triagem`, icon: AlertTriangle, tone: 'red' },
+    { label: 'Em andamento', value: String(reportItems.filter((item) => ['Em análise', 'Em correção', 'Em teste'].includes(item.status)).length), note: 'análise e correção', icon: Clock3, tone: 'blue' },
+    { label: 'Para retestar', value: String(reportItems.filter((item) => item.status === 'Aguardando reteste').length), note: 'aguardando qualidade', icon: FlaskConical, tone: 'amber' },
+    { label: 'Corrigidos', value: String(reportItems.filter((item) => item.status === 'Corrigido').length), note: 'histórico confirmado', icon: CircleCheck, tone: 'green' },
+  ];
+  const overviewTested = overviewRound?.items.filter((item) => ['Aprovado', 'Com bug'].includes(item.status)).length || 0;
+  const overviewProgress = overviewRound?.items.length ? Math.round((overviewTested / overviewRound.items.length) * 100) : 0;
 
   async function createReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -192,18 +207,28 @@ export default function Home() {
 
         <div className="mx-auto max-w-[1420px] px-5 py-7 sm:px-8">
           {activeSection === 'overview' ? <>
+          <section className="relative mb-5 min-h-[250px] overflow-hidden rounded-[26px] bg-[#0d281c] text-white shadow-[0_20px_55px_rgb(13_40_28/18%)]">
+            <img src="/dashboard/quality-hero.png" alt="Ilustração de testes, análise de bugs e entregas" className="absolute inset-0 h-full w-full object-cover object-right opacity-90" />
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,#0d281c_0%,#0d281c_f2_38%,#0d281c66_72%,transparent_100%)]" />
+            <div className="relative z-[1] flex min-h-[250px] max-w-[690px] flex-col justify-center px-6 py-8 sm:px-9">
+              <div className="flex flex-wrap items-center gap-2"><span className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/8 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[.12em] text-white/80"><span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[#d7ff66] opacity-60" /><span className="relative inline-flex size-2 rounded-full bg-[#d7ff66]" /></span> Painel ao vivo</span>{lastSync && <span className="text-[10px] text-white/45">Atualizado às {lastSync.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>}</div>
+              <h2 className="mt-5 max-w-lg text-3xl font-semibold leading-[1.08] tracking-[-.045em] sm:text-[38px]">Qualidade em movimento, sem perder nenhum detalhe.</h2>
+              <p className="mt-3 max-w-xl text-sm leading-6 text-white/62">Reports, testes e correções conectados em um único fluxo para a equipe agir mais rápido.</p>
+              <div className="mt-6 flex flex-wrap gap-2"><Button type="button" onClick={() => setNewReportOpen(true)} className="h-10 rounded-xl bg-[#d7ff66] px-4 text-[#173e2c] hover:bg-[#e2ff91]"><Plus /> Registrar problema</Button><Button type="button" onClick={() => setActiveSection('rounds')} variant="outline" className="h-10 rounded-xl border-white/18 bg-white/8 px-4 text-white hover:bg-white/15 hover:text-white"><PlayCircle /> Acompanhar rodada</Button></div>
+            </div>
+          </section>
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Resumo dos chamados">
-            {stats.map((stat) => { const Icon = stat.icon; return (
-              <article key={stat.label} className="rounded-2xl border border-[#dce5df] bg-white p-4 shadow-[0_1px_2px_rgb(16_39_29/3%)]">
-                <div className="flex items-start justify-between"><div><p className="text-xs font-medium text-[#64736b]">{stat.label}</p><p className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.04em]">{stat.value}</p></div><span className={`stat-icon stat-${stat.tone}`}><Icon className="size-[17px]" /></span></div>
-                <p className="mt-3 text-[11px] text-[#7b8981]">{stat.note}</p>
+            {dashboardStats.map((stat) => { const Icon = stat.icon; return (
+              <article key={stat.label} className="group relative overflow-hidden rounded-2xl border border-[#dce5df] bg-white p-4 shadow-[0_4px_18px_rgb(16_39_29/4%)] transition hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgb(16_39_29/9%)]">
+                <div className={`absolute inset-x-0 top-0 h-1 stat-${stat.tone}`} /><div className="flex items-start justify-between"><div><p className="text-xs font-medium text-[#64736b]">{stat.label}</p><p className="mt-2 text-[30px] font-semibold leading-none tracking-[-0.05em]">{stat.value}</p></div><span className={`stat-icon stat-${stat.tone} transition-transform group-hover:scale-110`}><Icon className="size-[17px]" /></span></div>
+                <div className="mt-3 flex items-center gap-2 text-[11px] text-[#7b8981]"><span className={`size-1.5 rounded-full stat-${stat.tone}`} />{stat.note}</div>
               </article>
             ); })}
           </section>
 
           <section className="mt-7 overflow-hidden rounded-2xl border border-[#dce5df] bg-white shadow-[0_3px_16px_rgb(16_39_29/4%)]">
             <div className="flex flex-col gap-4 border-b border-[#e4ebe7] p-5 sm:flex-row sm:items-center sm:justify-between">
-              <div><h2 className="text-[15px] font-semibold">Atividade recente</h2><p className="mt-1 text-xs text-[#718078]">Reports e testes que precisam da sua atenção</p></div>
+              <div><div className="flex items-center gap-2"><h2 className="text-[15px] font-semibold">Atividade recente</h2><span className="inline-flex items-center gap-1.5 rounded-full bg-[#edf8f0] px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-[#347951]"><span className="size-1.5 animate-pulse rounded-full bg-[#42a56d]" /> Tempo real</span></div><p className="mt-1 text-xs text-[#718078]">Reports e testes que precisam da sua atenção</p></div>
               <div className="flex items-center gap-2"><div className="relative min-w-0 flex-1 sm:w-[230px]"><Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-[#849088]" /><Input aria-label="Buscar reports" placeholder="Buscar report..." className="h-9 rounded-xl border-[#dce5df] bg-[#f8faf9] pl-8" /></div><Button variant="outline" className="h-9 rounded-xl bg-white text-xs">Todos os status</Button></div>
             </div>
             <div className="divide-y divide-[#e9eeeb]">
@@ -217,16 +242,16 @@ export default function Home() {
                 </button>
               ))}
             </div>
-            <div className="border-t border-[#e4ebe7] bg-[#fafcfb] px-5 py-3 text-center"><button className="text-[11px] font-semibold text-[#386349] hover:text-[#173e2c]">Ver todos os reports</button></div>
+            <div className="border-t border-[#e4ebe7] bg-[#fafcfb] px-5 py-3 text-center"><button onClick={() => setActiveSection('reports')} className="text-[11px] font-semibold text-[#386349] hover:text-[#173e2c]">Ver todos os reports</button></div>
           </section>
 
           <div className="mt-6 grid gap-5 xl:grid-cols-[1.35fr_.65fr]">
-            <section className="rounded-2xl border border-[#dce5df] bg-white p-5">
-              <div className="flex items-center justify-between"><div><h2 className="text-[15px] font-semibold">Testes U+ — 009/26</h2><p className="mt-1 text-xs text-[#718078]">Prazo: sexta-feira, 07/08</p></div><Badge variant="outline" className="border-[#b9d1c3] bg-[#f3faf5] text-[#306043]"><CalendarDays /> Em andamento</Badge></div>
-              <div className="mt-5 grid grid-cols-5 gap-1.5" aria-label="Progresso: três de cinco itens concluídos">{[true, true, true, false, false].map((done, index) => <span key={index} className={`h-2 rounded-full ${done ? 'bg-[#3e8a5e]' : 'bg-[#e4eae6]'}`} />)}</div>
-              <div className="mt-3 flex justify-between text-[11px] text-[#718078]"><span>3 de 5 itens concluídos</span><span className="font-semibold text-[#3e5b4b]">60%</span></div>
+            <section className="group rounded-2xl border border-[#dce5df] bg-white p-5 shadow-[0_4px_18px_rgb(16_39_29/4%)]">
+              <div className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-2"><span className="grid size-9 place-items-center rounded-xl bg-[#edf5f0] text-[#397657]"><ListChecks className="size-4" /></span><div><p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#56806a]">Rodada ativa</p><h2 className="mt-1 text-[15px] font-semibold">{overviewRound?.title || 'Nenhuma rodada ativa'}</h2></div></div><p className="mt-3 text-xs text-[#718078]">{overviewRound ? `${overviewRound.version} · prazo ${formatRoundDate(overviewRound.deadline)}` : 'Crie uma rodada para começar o acompanhamento.'}</p></div><Badge variant="outline" className="border-[#b9d1c3] bg-[#f3faf5] text-[#306043]"><CalendarDays /> {overviewRound?.status || 'Aguardando'}</Badge></div>
+              <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-[#e8eee9]"><div style={{ width: `${overviewProgress}%` }} className="h-full rounded-full bg-[linear-gradient(90deg,#347951,#d7ff66)] transition-all duration-700" /></div>
+              <div className="mt-3 flex justify-between text-[11px] text-[#718078]"><span>{overviewRound ? `${overviewTested} de ${overviewRound.items.length} itens testados` : 'Sem itens cadastrados'}</span><span className="font-semibold text-[#3e5b4b]">{overviewProgress}%</span></div><button onClick={() => setActiveSection('rounds')} className="mt-4 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#386349]">Abrir rodada <ChevronRight className="size-3.5 transition group-hover:translate-x-0.5" /></button>
             </section>
-            <section className="rounded-2xl border border-[#dce5df] bg-[#173e2c] p-5 text-white"><FileArchive className="size-5 text-[#d7ff66]" /><h2 className="mt-4 text-[15px] font-semibold">Backup obrigatório</h2><p className="mt-1.5 text-xs leading-5 text-white/60">Todo novo report exige uma cópia de segurança em formato CSV.</p></section>
+            <section className="relative min-h-[190px] overflow-hidden rounded-2xl border border-[#dce5df] bg-[linear-gradient(145deg,#fffdf5,#f0f8f3)] p-5 shadow-[0_4px_18px_rgb(16_39_29/4%)]"><div className="relative z-[1] max-w-[62%]"><p className="text-[10px] font-bold uppercase tracking-[.13em] text-[#7b6b35]">Dica da vez</p><h2 className="mt-3 text-[15px] font-semibold">Teste com contexto</h2><p className="mt-2 text-xs leading-5 text-[#66766d]">{qualityTips[tipIndex]}</p><div className="mt-4 flex gap-1">{qualityTips.map((_, index) => <span key={index} className={`h-1.5 rounded-full transition-all ${index === tipIndex ? 'w-5 bg-[#6d8f48]' : 'w-1.5 bg-[#d7dfd8]'}`} />)}</div></div><img src="/dashboard/quality-tip.png" alt="Ilustração de dica de qualidade" className="absolute -bottom-8 -right-9 h-[190px] w-[190px] object-contain drop-shadow-[0_14px_24px_rgb(23_62_44/18%)]" /></section>
           </div>
           </> : activeSection === 'reports' ? <ReportsView reports={reportItems} onSelect={openReport} onCreate={() => setNewReportOpen(true)} /> : activeSection === 'rounds' ? <RoundsView /> : activeSection === 'versions' ? <VersionsView /> : <TeamView currentUserName={currentUser?.displayName || userName} currentUserInitials={userInitials} />}
         </div>
