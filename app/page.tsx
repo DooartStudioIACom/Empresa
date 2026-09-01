@@ -50,6 +50,7 @@ export default function Home() {
   const [reportDetail, setReportDetail] = useState<ReportDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [replying, setReplying] = useState(false);
+  const [replyNotice, setReplyNotice] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -113,6 +114,7 @@ export default function Home() {
   async function openReport(report: ReportItem) {
     setSelectedReport(report);
     setReportDetail(null);
+    setReplyNotice(null);
     setDetailLoading(true);
     try {
       const response = await fetch(`/api/reports/${encodeURIComponent(report.id)}`);
@@ -125,19 +127,24 @@ export default function Home() {
   async function sendReply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedReport) return;
+    setReplyNotice(null);
     setReplying(true);
     const form = event.currentTarget;
     try {
       const response = await fetch(`/api/reports/${encodeURIComponent(selectedReport.id)}`, { method: 'POST', body: new FormData(form) });
-      if (!response.ok) throw new Error();
+      if (!response.ok) {
+        const failure = await response.json().catch(() => ({ error: 'Não foi possível enviar a resposta.' })) as { error?: string };
+        throw new Error(failure.error || 'Não foi possível enviar a resposta.');
+      }
       const payload = await response.json() as { status: string };
       setReportItems((items) => items.map((item) => item.id === selectedReport.id ? { ...item, status: payload.status, tone: statusTone(payload.status), updated: 'agora' } : item));
       setSelectedReport((current) => current ? { ...current, status: payload.status, tone: statusTone(payload.status), updated: 'agora' } : current);
       form.reset();
       const detailResponse = await fetch(`/api/reports/${encodeURIComponent(selectedReport.id)}`);
       if (detailResponse.ok) setReportDetail(await detailResponse.json());
-    } catch {
-      alert('Não foi possível enviar a resposta. Tente novamente.');
+      setReplyNotice({ tone: 'success', message: `Resposta registrada. Status atual: ${payload.status}.` });
+    } catch (error) {
+      setReplyNotice({ tone: 'error', message: error instanceof Error ? error.message : 'Não foi possível enviar a resposta. Tente novamente.' });
     } finally {
       setReplying(false);
     }
@@ -275,7 +282,7 @@ export default function Home() {
                 <div><p className="detail-label">Linha do tempo</p><div className="mt-3 space-y-4 border-l border-[#dce5df] pl-5">
                   {reportDetail?.activities.length ? reportDetail.activities.map((activity) => <Timeline key={activity.id} name={actorName(activity.actor_email)} role={activity.action === 'status_update' ? 'Atualização de status' : activity.action === 'attachment_added' ? 'Anexo' : 'Equipe'} time={formatDateTime(activity.created_at)} text={activity.message || 'Atualização registrada.'} highlighted={activity.action === 'status_update'} />) : <Timeline name="Equipe GEHA" role="Suporte" time="Histórico inicial" text="Report registrado para análise da equipe." />}
                 </div></div>
-                {reportDetail && <form onSubmit={sendReply} className="rounded-xl border border-[#dce5df] p-3"><Textarea name="message" placeholder="Escreva uma resposta ou o resultado do reteste..." className="min-h-20 border-0 p-1 shadow-none focus-visible:ring-0" /><div className="mt-2 grid gap-2 border-t border-[#edf1ef] pt-3 sm:grid-cols-[1fr_180px_auto]"><Input name="attachment" type="file" className="h-8 text-[10px]" aria-label="Anexar arquivo à resposta" /><select name="status" defaultValue={selectedReport.status} className="form-select"><option>Novo report</option><option>Em análise</option><option>Em correção</option><option>Aguardando reteste</option><option>Corrigido</option><option>Ainda ocorre</option></select><Button disabled={replying} size="sm" className="bg-[#173e2c] text-white">{replying ? <LoaderCircle className="animate-spin" /> : <MessageSquareText />} Responder</Button></div></form>}
+                {reportDetail && <form onSubmit={sendReply} className="rounded-xl border border-[#dce5df] p-3"><Textarea name="message" placeholder="Escreva uma resposta ou o resultado do reteste..." className="min-h-20 border-0 p-1 shadow-none focus-visible:ring-0" /><div className="mt-2 grid gap-2 border-t border-[#edf1ef] pt-3 sm:grid-cols-[1fr_180px_auto]"><Input name="attachment" type="file" className="h-8 text-[10px]" aria-label="Anexar arquivo à resposta" /><select name="status" defaultValue={selectedReport.status} className="form-select"><option>Novo report</option><option>Em análise</option><option>Em correção</option><option>Aguardando reteste</option><option>Corrigido</option><option>Ainda ocorre</option></select><Button type="submit" disabled={replying} size="sm" className="bg-[#173e2c] text-white">{replying ? <LoaderCircle className="animate-spin" /> : <MessageSquareText />} {replying ? 'Enviando...' : 'Responder'}</Button></div>{replyNotice && <div role="status" className={`mt-3 rounded-lg border px-3 py-2 text-[11px] ${replyNotice.tone === 'success' ? 'border-[#bfddc9] bg-[#eef8f1] text-[#2f7048]' : 'border-[#efc3bb] bg-[#fff2ef] text-[#9e3e31]'}`}>{replyNotice.message}</div>}</form>}
               </div>
               <aside className="space-y-4"><InfoCard label="Responsável" value="Desenvolvimento" /><InfoCard label="Urgência" value={Number(reportDetail?.report.urgent) === 1 ? 'Sim — prioritário' : 'Normal'} /><InfoCard label="Ambiente beta" value={String(reportDetail?.report.beta_status || 'Não testado')} />{reportDetail && <><InfoCard label="Possui cópia?" value={reportDetail.attachments.some((file) => file.kind === 'backup') ? 'Sim' : 'Não'} /><InfoCard label="Possui anexos?" value={reportDetail.attachments.some((file) => file.kind !== 'backup') ? 'Sim' : 'Não'} /></>}<div><p className="detail-label">Arquivos</p><div className="mt-2 space-y-2">{reportDetail?.attachments.length ? reportDetail.attachments.map((file) => <Attachment key={file.id} id={file.id} name={file.file_name} size={formatBytes(file.byte_size)} csv={file.kind === 'backup'} />) : <p className="rounded-lg bg-[#f4f7f5] p-3 text-[10px] text-[#7b8981]">Nenhum arquivo anexado.</p>}</div></div></aside>
             </div>}
