@@ -107,13 +107,11 @@ body {
 .upload-zone small { display:block; margin-top:.2rem; font-size:.625rem; color:#7a8980; }
 .file-input { max-width:14rem; border:0; padding:0; font-size:.7rem; }
 .detail-label { font-size:.625rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:#829087; }
-.beacon-aura { background:radial-gradient(circle,#d7ff6645 0%,#77d89122 42%,transparent 72%); filter:blur(5px); animation:beaconPulse 2.8s ease-in-out infinite; }
-.beacon-float { animation:beaconFloat 4s ease-in-out infinite; }
-.beacon-core { animation:beaconCore 1.8s ease-in-out infinite; }
-@keyframes beaconPulse { 0%,100% { transform:translateY(-50%) scale(.92); opacity:.58; } 50% { transform:translateY(-50%) scale(1.08); opacity:1; } }
-@keyframes beaconFloat { 0%,100% { transform:translateY(-50%) translateY(0); } 50% { transform:translateY(-50%) translateY(-8px); } }
-@keyframes beaconCore { 0%,100% { opacity:.34; transform:translate(-50%,-50%) scale(.82); } 50% { opacity:.72; transform:translate(-50%,-50%) scale(1.12); } }
-@media (prefers-reduced-motion: reduce) { .beacon-aura,.beacon-float,.beacon-core { animation:none; } }
+.beacon-light-ring { background:radial-gradient(circle,#d7ff6650 0%,#77d89120 46%,transparent 72%); filter:blur(6px); animation:beaconLight 2.6s ease-in-out infinite; }
+.beacon-on { filter:drop-shadow(0 0 18px #d7ff6655); animation:beaconBrightness 2.4s ease-in-out infinite; }
+@keyframes beaconLight { 0%,100% { opacity:.48; transform:scale(.94); } 50% { opacity:.9; transform:scale(1.04); } }
+@keyframes beaconBrightness { 0%,100% { filter:drop-shadow(0 0 15px #d7ff6648); } 50% { filter:drop-shadow(0 0 29px #d7ff6678); } }
+@media (prefers-reduced-motion: reduce) { .beacon-light-ring,.beacon-on { animation:none; } }
 
 .dark {
   --background: oklch(0.145 0 0);
