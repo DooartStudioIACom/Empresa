@@ -229,6 +229,7 @@ export default function Home() {
             <DialogHeader className="border-b border-[#e4ebe7] px-6 py-5">
               <div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-xl bg-[#eaf4ed] text-[#246142]"><Bug className="size-4" /></span><div><DialogTitle className="text-lg">Novo report técnico</DialogTitle><DialogDescription className="mt-1">Registre o problema com os dados necessários para o Desenvolvimento.</DialogDescription></div></div>
             </DialogHeader>
+            {formError && <div role="alert" className="mx-6 mt-5 flex items-start gap-2 rounded-xl border border-[#efc3bb] bg-[#fff2ef] p-3 text-xs leading-5 text-[#9e3e31]"><AlertTriangle className="mt-0.5 size-4 shrink-0" /><span>{formError}</span></div>}
             <div className="space-y-6 px-6 py-5">
               <FormSection title="Dados do cliente" description="Preencha quando o problema estiver ligado a uma instituição.">
                 <Field label="Instituição"><Input name="institution" required placeholder="Ex.: Colégio Estadual Ivo Leão" /></Field>
@@ -253,9 +254,8 @@ export default function Home() {
                 {hasAttachments && <label className="upload-zone"><FileImage className="size-5 text-[#6b7d73]" /><span><strong>Prints do erro *</strong><small>PNG, JPG ou WEBP · selecione um ou mais arquivos</small></span><Input name="screenshots" type="file" accept="image/png,image/jpeg,image/webp" multiple required className="file-input" /></label>}
               </FormSection>
               <label className="flex items-start gap-3 rounded-xl border border-[#dfe8e2] bg-[#f8fbf9] p-4 text-xs leading-5 text-[#52655a]"><input required type="checkbox" className="mt-1 accent-[#296444]" /><span>Confirmo que as informações acima representam corretamente o que acompanha este report.</span></label>
-              {formError && <div role="alert" className="flex items-start gap-2 rounded-xl border border-[#efc3bb] bg-[#fff2ef] p-3 text-xs leading-5 text-[#9e3e31]"><AlertTriangle className="mt-0.5 size-4 shrink-0" /><span>{formError}</span></div>}
             </div>
-            <DialogFooter className="mx-0 mb-0 px-6"><Button type="button" variant="outline" onClick={() => setNewReportOpen(false)}>Cancelar</Button><Button disabled={saving || saved} className="bg-[#173e2c] text-white hover:bg-[#24573f]">{saving ? <><LoaderCircle className="animate-spin" /> Salvando...</> : saved ? <><Check /> Report criado</> : 'Enviar para Desenvolvimento'}</Button></DialogFooter>
+            <DialogFooter className="mx-0 mb-0 px-6"><Button type="button" variant="outline" onClick={() => setNewReportOpen(false)}>Cancelar</Button><Button type="submit" disabled={saving || saved} className="bg-[#173e2c] text-white hover:bg-[#24573f]">{saving ? <><LoaderCircle className="animate-spin" /> Salvando...</> : saved ? <><Check /> Report criado</> : 'Enviar para Desenvolvimento'}</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
