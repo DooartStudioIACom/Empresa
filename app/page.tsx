@@ -19,6 +19,8 @@ type ReportDetail = {
   attachments: Array<{ id: string; file_name: string; content_type: string; byte_size: number; kind: string; created_at: number }>;
   activities: Array<{ id: string; actor_email: string; action: string; message: string | null; created_at: number }>;
 };
+type TestRoundItem = { id: string; round_id: string; position: number; title: string; path: string | null; description: string | null; status: string; tester_email: string | null; result_note: string | null; updated_at: number };
+type TestRound = { id: string; title: string; version: string; deadline: string; description: string | null; status: string; author_email: string; created_at: number; updated_at: number; items: TestRoundItem[] };
 
 const stats = [
   { label: 'Novos reports', value: '3', note: '1 urgente', icon: AlertTriangle, tone: 'red' },
@@ -322,18 +324,66 @@ function ReportsView({ reports, onSelect, onCreate }: { reports: ReportItem[]; o
 }
 
 function RoundsView() {
-  const testItems = [
-    ['Perfis de acesso', 'Concluído', true], ['Recursos — aviso de salas', 'Concluído', true], ['Super Revisor', 'Em teste', false], ['Geminações — melhores horários', 'Aguardando', false], ['Tour do sistema', 'Concluído', true],
-  ] as const;
+  const [rounds, setRounds] = useState<TestRound[]>([]);
+  const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
+  const [newRoundOpen, setNewRoundOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<TestRoundItem | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [savingRound, setSavingRound] = useState(false);
+  const [savingItem, setSavingItem] = useState(false);
+  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/rounds').then(async (response) => {
+      if (!response.ok) throw new Error('Não foi possível carregar as rodadas.');
+      return response.json() as Promise<{ rounds: TestRound[] }>;
+    }).then((payload) => { setRounds(payload.rounds); setSelectedRoundId(payload.rounds[0]?.id || null); }).catch((error) => setNotice({ tone: 'error', message: error.message })).finally(() => setLoading(false));
+  }, []);
+
+  const selectedRound = rounds.find((round) => round.id === selectedRoundId) || rounds[0] || null;
+  const tested = selectedRound?.items.filter((item) => ['Aprovado', 'Com bug'].includes(item.status)).length || 0;
+  const progress = selectedRound?.items.length ? Math.round((tested / selectedRound.items.length) * 100) : 0;
+
+  async function createRound(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setNotice(null); setSavingRound(true);
+    const form = event.currentTarget, data = new FormData(form);
+    const items = String(data.get('items') || '').split('\n').map((line) => line.trim()).filter(Boolean).map((line) => { const parts = line.split('|').map((part) => part.trim()); return parts.length > 1 ? { path: parts[0], title: parts.slice(1).join(' | ') } : { title: line, path: '' }; });
+    try {
+      const response = await fetch('/api/rounds', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: data.get('title'), version: data.get('version'), deadline: data.get('deadline'), description: data.get('description'), items }) });
+      const payload = await response.json() as { round?: TestRound; error?: string };
+      if (!response.ok || !payload.round) throw new Error(payload.error || 'Não foi possível criar a rodada.');
+      setRounds((current) => [payload.round!, ...current]); setSelectedRoundId(payload.round.id); setNewRoundOpen(false); form.reset(); setNotice({ tone: 'success', message: 'Rodada criada e liberada para a equipe.' });
+    } catch (error) { setNotice({ tone: 'error', message: error instanceof Error ? error.message : 'Não foi possível criar a rodada.' }); }
+    finally { setSavingRound(false); }
+  }
+
+  async function updateItem(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); if (!selectedRound || !selectedItem) return; setSavingItem(true); setNotice(null);
+    const data = new FormData(event.currentTarget);
+    try {
+      const response = await fetch(`/api/rounds/${encodeURIComponent(selectedRound.id)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ itemId: selectedItem.id, status: data.get('status'), note: data.get('note') }) });
+      const payload = await response.json() as { item?: Partial<TestRoundItem> & { id: string }; roundStatus?: string; error?: string };
+      if (!response.ok || !payload.item) throw new Error(payload.error || 'Não foi possível atualizar o teste.');
+      setRounds((current) => current.map((round) => round.id === selectedRound.id ? { ...round, status: payload.roundStatus || round.status, items: round.items.map((item) => item.id === payload.item!.id ? { ...item, ...payload.item } : item) } : round));
+      setSelectedItem(null); setNotice({ tone: 'success', message: 'Resultado do teste registrado.' });
+    } catch (error) { setNotice({ tone: 'error', message: error instanceof Error ? error.message : 'Não foi possível atualizar o teste.' }); }
+    finally { setSavingItem(false); }
+  }
+
   return <div>
-    <ViewHeading eyebrow="Planejamento de qualidade" title="Rodadas de testes" description="Organize o que precisa ser testado em cada entrega do U+." action={<Button className="bg-[#173e2c] text-white"><Plus /> Nova rodada</Button>} />
-    <div className="mt-6 grid gap-5 xl:grid-cols-[1.35fr_.65fr]">
+    <ViewHeading eyebrow="Planejamento de qualidade" title="Rodadas de testes" description="Organize os itens enviados pela gerência e acompanhe o resultado de cada teste." action={<Button type="button" onClick={() => setNewRoundOpen(true)} className="bg-[#173e2c] text-white"><Plus /> Nova rodada</Button>} />
+    {notice && <div role="status" className={`mt-5 rounded-xl border px-4 py-3 text-xs ${notice.tone === 'success' ? 'border-[#bfddc9] bg-[#eef8f1] text-[#2f7048]' : 'border-[#efc3bb] bg-[#fff2ef] text-[#9e3e31]'}`}>{notice.message}</div>}
+    {loading ? <div className="mt-10 flex items-center justify-center gap-2 text-xs text-[#718078]"><LoaderCircle className="size-4 animate-spin" /> Carregando rodadas...</div> : !selectedRound ? <section className="mt-6 rounded-2xl border border-dashed border-[#cfdcd4] bg-white px-6 py-14 text-center"><ListChecks className="mx-auto size-7 text-[#668274]" /><h3 className="mt-4 text-sm font-semibold">Nenhuma rodada cadastrada</h3><p className="mt-2 text-xs text-[#78867e]">Crie a primeira rodada com os itens que chegaram da gerência.</p><Button type="button" onClick={() => setNewRoundOpen(true)} className="mt-5 bg-[#173e2c] text-white"><Plus /> Criar rodada</Button></section> : <div className="mt-6 grid gap-5 xl:grid-cols-[1.35fr_.65fr]">
       <section className="overflow-hidden rounded-2xl border border-[#dce5df] bg-white">
-        <div className="border-b border-[#e4ebe7] bg-[#173e2c] p-5 text-white"><div className="flex items-start justify-between"><div><Badge className="bg-[#d7ff66] text-[#173e2c]">RODADA ATIVA</Badge><h2 className="mt-3 text-xl font-semibold">Testes U+ — 009/26</h2><p className="mt-1 text-xs text-white/55">Criada por Bruno Milfont · prazo 07/08</p></div><span className="grid size-10 place-items-center rounded-xl bg-white/10"><PlayCircle className="size-5 text-[#d7ff66]" /></span></div><div className="mt-5 flex items-center gap-3"><div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10"><div className="h-full w-[60%] bg-[#d7ff66]" /></div><span className="text-xs font-semibold">60%</span></div></div>
-        <div className="divide-y divide-[#e9eeeb]">{testItems.map(([label, status, done], index) => <button key={label} className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-[#f8faf9]"><span className={`grid size-7 place-items-center rounded-full ${done ? 'bg-[#e9f5ed] text-[#367a52]' : 'bg-[#f2f4f2] text-[#89958e]'}`}>{done ? <CheckCircle2 className="size-4" /> : <span className="text-[10px] font-semibold">{index + 1}</span>}</span><span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold">{label}</span><span className="mt-1 block text-[10px] text-[#849088]">Item {index + 1} de 5</span></span><span className={`text-[10px] font-semibold ${done ? 'text-[#3e8058]' : status === 'Em teste' ? 'text-[#3f72a2]' : 'text-[#8a958f]'}`}>{status}</span><ChevronRight className="size-4 text-[#a6b0aa]" /></button>)}</div>
+        <div className="border-b border-[#e4ebe7] bg-[#173e2c] p-5 text-white"><div className="flex items-start justify-between gap-4"><div><Badge className="bg-[#d7ff66] text-[#173e2c]">{selectedRound.status.toUpperCase()}</Badge><h2 className="mt-3 text-xl font-semibold">{selectedRound.title}</h2><p className="mt-1 text-xs text-white/55">{selectedRound.version} · prazo {formatRoundDate(selectedRound.deadline)}</p>{selectedRound.description && <p className="mt-3 max-w-2xl text-xs leading-5 text-white/70">{selectedRound.description}</p>}</div><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/10"><PlayCircle className="size-5 text-[#d7ff66]" /></span></div><div className="mt-5 flex items-center gap-3"><div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10"><div style={{ width: `${progress}%` }} className="h-full bg-[#d7ff66] transition-all" /></div><span className="text-xs font-semibold">{progress}%</span></div></div>
+        <div className="divide-y divide-[#e9eeeb]">{selectedRound.items.map((item) => { const done = ['Aprovado', 'Com bug'].includes(item.status); return <button type="button" onClick={() => setSelectedItem(item)} key={item.id} className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-[#f8faf9]"><span className={`grid size-7 shrink-0 place-items-center rounded-full ${item.status === 'Aprovado' ? 'bg-[#e9f5ed] text-[#367a52]' : item.status === 'Com bug' ? 'bg-[#fff0ed] text-[#a94a3c]' : item.status === 'Em teste' ? 'bg-[#eaf2fb] text-[#3f72a2]' : 'bg-[#f2f4f2] text-[#89958e]'}`}>{done ? item.status === 'Aprovado' ? <CheckCircle2 className="size-4" /> : <Bug className="size-3.5" /> : <span className="text-[10px] font-semibold">{item.position}</span>}</span><span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold">{item.title}</span><span className="mt-1 block truncate text-[10px] text-[#849088]">{item.path || `Item ${item.position} de ${selectedRound.items.length}`}</span></span><span className={`text-[10px] font-semibold ${item.status === 'Aprovado' ? 'text-[#3e8058]' : item.status === 'Com bug' ? 'text-[#a94a3c]' : item.status === 'Em teste' ? 'text-[#3f72a2]' : 'text-[#8a958f]'}`}>{item.status}</span><ChevronRight className="size-4 text-[#a6b0aa]" /></button>; })}</div>
       </section>
-      <div className="space-y-4"><InfoPanel icon={CalendarDays} title="Prazo da rodada" value="Sexta-feira, 07/08" note="5 itens · 3 concluídos" /><InfoPanel icon={Bug} title="Bugs encontrados" value="3 reports" note="1 corrigido · 2 em andamento" /><section className="rounded-2xl border border-[#dce5df] bg-white p-5"><p className="detail-label">Rodadas anteriores</p>{[['U+ 008/26','Concluída','30/07'],['U+ 007/26','Concluída','17/07'],['U+ 006/26','Arquivada','03/07']].map(([name,status,date]) => <button key={name} className="mt-3 flex w-full items-center gap-3 border-b border-[#edf1ef] pb-3 text-left last:border-0 last:pb-0"><PackageCheck className="size-4 text-[#56806a]" /><span className="flex-1 text-xs font-semibold">{name}</span><span className="text-[10px] text-[#849088]">{status} · {date}</span></button>)}</section></div>
-    </div>
+      <div className="space-y-4"><InfoPanel icon={CalendarDays} title="Prazo da rodada" value={formatRoundDate(selectedRound.deadline)} note={`${selectedRound.items.length} itens · ${tested} testados`} /><InfoPanel icon={Bug} title="Problemas encontrados" value={`${selectedRound.items.filter((item) => item.status === 'Com bug').length} itens`} note="Itens marcados como Com bug" /><section className="rounded-2xl border border-[#dce5df] bg-white p-5"><p className="detail-label">Todas as rodadas</p>{rounds.map((round) => <button type="button" onClick={() => setSelectedRoundId(round.id)} key={round.id} className={`mt-3 flex w-full items-center gap-3 border-b border-[#edf1ef] pb-3 text-left last:border-0 last:pb-0 ${round.id === selectedRound.id ? 'text-[#2f7048]' : ''}`}><PackageCheck className="size-4 text-[#56806a]" /><span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold">{round.version}</span><span className="text-[9px] text-[#87938c]">{round.title}</span></span><span className="text-[10px] text-[#849088]">{round.status}</span></button>)}</section></div>
+    </div>}
+
+    <Dialog open={newRoundOpen} onOpenChange={setNewRoundOpen}><DialogContent className="max-h-[92vh] overflow-y-auto p-0 sm:max-w-2xl"><form onSubmit={createRound}><DialogHeader className="border-b border-[#e4ebe7] px-6 py-5"><DialogTitle>Nova rodada de testes</DialogTitle><DialogDescription>Cadastre a entrega, o prazo e tudo o que a equipe precisa testar.</DialogDescription></DialogHeader><div className="space-y-4 px-6 py-5"><Field label="Título da rodada"><Input name="title" required placeholder="Testes U+ — 010/26" /></Field><div className="grid gap-4 sm:grid-cols-2"><Field label="Versão"><Input name="version" required placeholder="U+ 010/26" /></Field><Field label="Prazo"><Input name="deadline" type="date" required /></Field></div><Field label="Orientações gerais"><Textarea name="description" placeholder="Explique o objetivo da rodada e os cuidados durante os testes." /></Field><Field label="Itens a testar"><Textarea name="items" required className="min-h-40" placeholder={'Um item por linha. Você também pode usar:\nSua Conta > Configurações | Perfis de acesso\nControles > Recursos | Aviso de salas'} /></Field><p className="text-[10px] leading-4 text-[#7d8a83]">Cada linha vira um item separado. Use “caminho | nome do teste” quando quiser informar onde testar.</p></div><DialogFooter className="px-6"><Button type="button" variant="outline" onClick={() => setNewRoundOpen(false)}>Cancelar</Button><Button type="submit" disabled={savingRound} className="bg-[#173e2c] text-white">{savingRound ? <><LoaderCircle className="animate-spin" /> Criando...</> : <><Plus /> Criar rodada</>}</Button></DialogFooter></form></DialogContent></Dialog>
+
+    <Dialog open={Boolean(selectedItem)} onOpenChange={(open) => !open && setSelectedItem(null)}><DialogContent className="p-0 sm:max-w-xl">{selectedItem && <form onSubmit={updateItem}><DialogHeader className="border-b border-[#e4ebe7] px-6 py-5"><DialogTitle>{selectedItem.title}</DialogTitle><DialogDescription>{selectedItem.path || `Item ${selectedItem.position} da rodada`}</DialogDescription></DialogHeader><div className="space-y-4 px-6 py-5">{selectedItem.description && <p className="rounded-xl bg-[#f5f8f6] p-4 text-xs leading-5 text-[#607067]">{selectedItem.description}</p>}<Field label="Resultado do teste"><select name="status" defaultValue={selectedItem.status} className="form-select"><option>Pendente</option><option>Em teste</option><option>Aprovado</option><option>Com bug</option></select></Field><Field label="Observação"><Textarea name="note" defaultValue={selectedItem.result_note || ''} className="min-h-28" placeholder="Descreva o que foi testado e o resultado encontrado." /></Field></div><DialogFooter className="px-6"><Button type="button" variant="outline" onClick={() => setSelectedItem(null)}>Cancelar</Button><Button type="submit" disabled={savingItem} className="bg-[#173e2c] text-white">{savingItem ? <><LoaderCircle className="animate-spin" /> Salvando...</> : <><Check /> Salvar resultado</>}</Button></DialogFooter></form>}</DialogContent></Dialog>
   </div>;
 }
 
@@ -390,6 +440,7 @@ function initials(name: string) {
   return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 }
 function statusTone(status: string) { if (status === 'Corrigido') return 'green'; if (status === 'Aguardando reteste') return 'amber'; if (['Em análise', 'Em correção', 'Em teste'].includes(status)) return 'blue'; return 'red'; }
+function formatRoundDate(value: string) { const date = new Date(`${value}T12:00:00`); return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('pt-BR'); }
 function apiReportToItem(row: Record<string, unknown>): ReportItem { const email = String(row.author_email || 'EQ'); return { id: String(row.id), title: String(row.function_name || 'Report'), client: String(row.institution || 'Cliente não informado'), copy: String(row.copy_number || 'Sem cópia'), version: String(row.version || 'Sem versão'), status: String(row.status || 'Novo report'), tone: statusTone(String(row.status || 'Novo report')), owner: initials(email.includes('@') ? email.split('@')[0] : email).slice(0, 2), updated: formatDateTime(Number(row.updated_at || Date.now())), attachments: Number(row.attachment_count || 0) }; }
 function formatDateTime(value: number) { return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value)); }
 function actorName(email: string) { const local = email.split('@')[0].replace(/[._-]+/g, ' '); return local.replace(/\b\w/g, (letter) => letter.toUpperCase()); }

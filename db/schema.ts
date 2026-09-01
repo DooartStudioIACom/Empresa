@@ -11,3 +11,11 @@ export const attachments = sqliteTable('attachments', {
 export const activities = sqliteTable('activities', {
   id: text('id').primaryKey(), reportId: text('report_id').notNull().references(() => reports.id, { onDelete: 'cascade' }), actorId: text('actor_id').notNull(), actorEmail: text('actor_email').notNull(), action: text('action').notNull(), message: text('message'), createdAt: integer('created_at').notNull(),
 }, (table) => [index('idx_activities_report_created_at').on(table.reportId, table.createdAt)]);
+
+export const testRounds = sqliteTable('test_rounds', {
+  id: text('id').primaryKey(), title: text('title').notNull(), version: text('version').notNull(), deadline: text('deadline').notNull(), description: text('description'), status: text('status').notNull().default('Em andamento'), authorId: text('author_id').notNull(), authorEmail: text('author_email').notNull(), createdAt: integer('created_at').notNull(), updatedAt: integer('updated_at').notNull(),
+}, (table) => [index('idx_test_rounds_status_updated_at').on(table.status, table.updatedAt)]);
+
+export const testItems = sqliteTable('test_items', {
+  id: text('id').primaryKey(), roundId: text('round_id').notNull().references(() => testRounds.id, { onDelete: 'cascade' }), position: integer('position').notNull(), title: text('title').notNull(), path: text('path'), description: text('description'), status: text('status').notNull().default('Pendente'), testerId: text('tester_id'), testerEmail: text('tester_email'), resultNote: text('result_note'), updatedAt: integer('updated_at').notNull(),
+}, (table) => [index('idx_test_items_round_position').on(table.roundId, table.position)]);
