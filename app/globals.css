@@ -107,6 +107,13 @@ body {
 .upload-zone small { display:block; margin-top:.2rem; font-size:.625rem; color:#7a8980; }
 .file-input { max-width:14rem; border:0; padding:0; font-size:.7rem; }
 .detail-label { font-size:.625rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:#829087; }
+.beacon-aura { background:radial-gradient(circle,#d7ff6645 0%,#77d89122 42%,transparent 72%); filter:blur(5px); animation:beaconPulse 2.8s ease-in-out infinite; }
+.beacon-float { animation:beaconFloat 4s ease-in-out infinite; }
+.beacon-core { animation:beaconCore 1.8s ease-in-out infinite; }
+@keyframes beaconPulse { 0%,100% { transform:translateY(-50%) scale(.92); opacity:.58; } 50% { transform:translateY(-50%) scale(1.08); opacity:1; } }
+@keyframes beaconFloat { 0%,100% { transform:translateY(-50%) translateY(0); } 50% { transform:translateY(-50%) translateY(-8px); } }
+@keyframes beaconCore { 0%,100% { opacity:.34; transform:translate(-50%,-50%) scale(.82); } 50% { opacity:.72; transform:translate(-50%,-50%) scale(1.12); } }
+@media (prefers-reduced-motion: reduce) { .beacon-aura,.beacon-float,.beacon-core { animation:none; } }
 
 .dark {
   --background: oklch(0.145 0 0);
