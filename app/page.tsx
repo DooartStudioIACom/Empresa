@@ -50,6 +50,7 @@ export default function Home() {
   const [reportDetail, setReportDetail] = useState<ReportDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [replying, setReplying] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/me')
@@ -70,13 +71,23 @@ export default function Home() {
 
   async function createReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
+    setFormError(null);
+    if (!form.checkValidity()) {
+      const firstInvalid = form.querySelector<HTMLElement>(':invalid');
+      firstInvalid?.focus();
+      setFormError('Revise os campos obrigatórios destacados antes de enviar.');
+      return;
+    }
     setSaving(true);
     setSaved(false);
-    const form = event.currentTarget;
     const data = new FormData(form);
     try {
       const response = await fetch('/api/reports', { method: 'POST', body: data });
-      if (!response.ok) throw new Error('Não foi possível registrar o report.');
+      if (!response.ok) {
+        const failure = await response.json().catch(() => ({ error: 'Não foi possível registrar o report.' })) as { error?: string };
+        throw new Error(failure.error || 'Não foi possível registrar o report.');
+      }
       const created = await response.json() as { id: string };
       setReportItems((current) => [{
         id: created.id,
@@ -92,8 +103,8 @@ export default function Home() {
       setHasBackup(true);
       setHasAttachments(true);
       window.setTimeout(() => { setNewReportOpen(false); setSaved(false); }, 900);
-    } catch {
-      alert('Não foi possível salvar o report. Confira o CSV e tente novamente.');
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Não foi possível salvar o report. Tente novamente.');
     } finally {
       setSaving(false);
     }
@@ -214,7 +225,7 @@ export default function Home() {
 
       <Dialog open={newReportOpen} onOpenChange={setNewReportOpen}>
         <DialogContent className="max-h-[92vh] overflow-y-auto p-0 sm:max-w-3xl">
-          <form onSubmit={createReport}>
+          <form onSubmit={createReport} noValidate>
             <DialogHeader className="border-b border-[#e4ebe7] px-6 py-5">
               <div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-xl bg-[#eaf4ed] text-[#246142]"><Bug className="size-4" /></span><div><DialogTitle className="text-lg">Novo report técnico</DialogTitle><DialogDescription className="mt-1">Registre o problema com os dados necessários para o Desenvolvimento.</DialogDescription></div></div>
             </DialogHeader>
@@ -242,6 +253,7 @@ export default function Home() {
                 {hasAttachments && <label className="upload-zone"><FileImage className="size-5 text-[#6b7d73]" /><span><strong>Prints do erro *</strong><small>PNG, JPG ou WEBP · selecione um ou mais arquivos</small></span><Input name="screenshots" type="file" accept="image/png,image/jpeg,image/webp" multiple required className="file-input" /></label>}
               </FormSection>
               <label className="flex items-start gap-3 rounded-xl border border-[#dfe8e2] bg-[#f8fbf9] p-4 text-xs leading-5 text-[#52655a]"><input required type="checkbox" className="mt-1 accent-[#296444]" /><span>Confirmo que as informações acima representam corretamente o que acompanha este report.</span></label>
+              {formError && <div role="alert" className="flex items-start gap-2 rounded-xl border border-[#efc3bb] bg-[#fff2ef] p-3 text-xs leading-5 text-[#9e3e31]"><AlertTriangle className="mt-0.5 size-4 shrink-0" /><span>{formError}</span></div>}
             </div>
             <DialogFooter className="mx-0 mb-0 px-6"><Button type="button" variant="outline" onClick={() => setNewReportOpen(false)}>Cancelar</Button><Button disabled={saving || saved} className="bg-[#173e2c] text-white hover:bg-[#24573f]">{saving ? <><LoaderCircle className="animate-spin" /> Salvando...</> : saved ? <><Check /> Report criado</> : 'Enviar para Desenvolvimento'}</Button></DialogFooter>
           </form>
