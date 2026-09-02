@@ -423,8 +423,11 @@ function ReportsView({ reports, onSelect }: { reports: ReportItem[]; onSelect: (
     return matchesQuery && matchesFilter;
   });
   return <div>
-    <p className="max-w-3xl text-sm leading-6 text-[#62736a]">Acompanhe cada report do registro inicial à análise, correção e validação final, com todo o histórico centralizado.</p>
-    <div className="mt-6 grid gap-3 sm:grid-cols-3"><MiniStat value={String(reports.filter((report) => report.status !== 'Corrigido').length)} label="Reports abertos" tone="red" /><MiniStat value={String(reports.filter((report) => report.status === 'Aguardando reteste').length)} label="Aguardando reteste" tone="amber" /><MiniStat value={String(reports.filter((report) => report.status === 'Corrigido').length)} label="Reports corrigidos" tone="green" /></div>
+    <div className="flex items-center gap-3 rounded-2xl border border-[#d6e2da] bg-[linear-gradient(110deg,#ffffff_0%,#f4f8f5_100%)] px-4 py-3.5 shadow-[0_8px_24px_-25px_#173e2c]">
+      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#e9f3ec] text-[#397657] ring-1 ring-[#d6e4da]"><MessageSquareText className="size-4" /></span>
+      <p className="text-xs leading-5 text-[#68786f] sm:text-[13px]"><strong className="font-semibold text-[#263b2f]">Acompanhe cada report</strong> do registro inicial à análise, correção e validação final, com todo o histórico centralizado.</p>
+    </div>
+    <div className="mt-4 grid gap-3 sm:grid-cols-3"><MiniStat value={String(reports.filter((report) => report.status !== 'Corrigido').length)} label="Reports abertos" tone="red" /><MiniStat value={String(reports.filter((report) => report.status === 'Aguardando reteste').length)} label="Aguardando reteste" tone="amber" /><MiniStat value={String(reports.filter((report) => report.status === 'Corrigido').length)} label="Reports corrigidos" tone="green" /></div>
     <section className="mt-5 overflow-hidden rounded-2xl border border-[#dce5df] bg-white">
       <div className="flex flex-col gap-3 border-b border-[#e4ebe7] p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-1.5">{['Todos', 'Novos', 'Em andamento', 'Reteste', 'Corrigidos'].map((item) => <button onClick={() => setFilter(item)} key={item} className={`rounded-lg px-3 py-1.5 text-[11px] font-medium ${filter === item ? 'bg-[#173e2c] text-white' : 'bg-[#f0f4f1] text-[#64756b] hover:bg-[#e5ece7]'}`}>{item}</button>)}</div>
