@@ -250,16 +250,19 @@ export default function Home() {
       </aside>
 
       <main className="lg:ml-[238px]">
-        <header className="sticky top-0 z-10 isolate flex min-h-[88px] items-center justify-between overflow-hidden border-b border-[#d6e2da] bg-[linear-gradient(115deg,rgba(255,255,255,.97)_0%,rgba(245,249,246,.96)_55%,rgba(237,245,240,.96)_100%)] px-5 shadow-[0_8px_28px_-25px_#173e2c] backdrop-blur-xl sm:px-8">
-          <div className="pointer-events-none absolute inset-y-0 right-[138px] hidden w-[520px] opacity-[.42] lg:block"><img src="/header/quality-flow.png" alt="" aria-hidden="true" className="h-full w-full object-contain object-right" /></div>
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-[linear-gradient(90deg,#4f8b66_0%,#d7ff66_22%,transparent_58%)] opacity-70" />
-          <div className="relative z-[1] flex min-w-0 items-center gap-3.5">
-            <span className="grid size-11 shrink-0 place-items-center rounded-2xl border border-[#d8e5dc] bg-white/90 text-[#397657] shadow-[0_10px_30px_-24px_#173e2c]"><ActiveHeaderIcon className="size-[18px]" /></span>
-            <div className="min-w-0"><div className="flex items-center gap-2"><p className="truncate text-[10px] font-bold uppercase tracking-[0.15em] text-[#4f7861]">GEHA Resolve</p><span className="size-1 rounded-full bg-[#9ab2a2]" /><p className="hidden truncate text-[9px] font-semibold uppercase tracking-[.11em] text-[#8a9990] sm:block">{pageContext}</p></div><h1 className="mt-1 truncate text-[19px] font-semibold tracking-[-0.03em] text-[#1d3026]">{pageTitle}</h1></div>
-          </div>
-          <div className="relative z-[2] ml-4 flex shrink-0 items-center gap-2.5 rounded-2xl border border-white/80 bg-white/55 p-1.5 shadow-[0_10px_30px_-27px_#173e2c] backdrop-blur-md">
-            <Button variant="outline" size="icon" aria-label="Notificações" className="relative size-9 rounded-xl border-[#d9e4dd] bg-white/90 hover:bg-white"><Bell className="size-4" /><span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-[#ef6a5b] ring-2 ring-white" /></Button>
-            <Button onClick={() => setNewReportOpen(true)} className="h-9 rounded-xl bg-[#173e2c] px-3.5 text-white shadow-[0_8px_20px_-14px_#173e2c] hover:bg-[#24573f] sm:px-4"><Plus className="size-4" /><span className="hidden sm:inline">Novo report</span><span className="sm:hidden">Report</span></Button>
+        <header className="sticky top-0 z-10 border-b border-[#dbe5df] bg-[#f4f7f5]/95 px-3 py-2.5 backdrop-blur-xl sm:px-5">
+          <div className="relative isolate flex min-h-[76px] w-full items-center justify-between overflow-hidden rounded-[22px] border border-[#c8d8ce] bg-[linear-gradient(105deg,#fdfefd_0%,#f4f9f5_44%,#e8f2eb_100%)] px-4 shadow-[inset_0_1px_0_white,0_12px_34px_-28px_#173e2c] sm:px-5">
+            <div className="pointer-events-none absolute inset-[4px] rounded-[17px] border border-white/75" />
+            <div className="pointer-events-none absolute inset-y-0 right-[145px] hidden w-[500px] opacity-[.22] lg:block"><img src="/header/quality-flow.png" alt="" aria-hidden="true" className="h-full w-full object-contain object-right" /></div>
+            <div className="pointer-events-none absolute inset-y-3 left-0 w-[3px] rounded-r-full bg-[linear-gradient(180deg,#173e2c,#7daf88,#d7ff66)]" />
+            <div className="relative z-[1] flex min-w-0 items-center gap-3.5">
+              <span className="grid size-11 shrink-0 place-items-center rounded-[15px] bg-[#173e2c] text-[#d7ff66] shadow-[0_10px_24px_-17px_#173e2c] ring-1 ring-white/70"><ActiveHeaderIcon className="size-[18px]" /></span>
+              <div className="min-w-0"><div className="flex items-center gap-2"><p className="truncate text-[9px] font-bold uppercase tracking-[0.17em] text-[#477058]">GEHA Resolve</p><span className="size-1 rounded-full bg-[#9ab2a2]" /><p className="hidden truncate text-[9px] font-semibold uppercase tracking-[.1em] text-[#7f9187] sm:block">{pageContext}</p></div><h1 className="mt-1 truncate text-[19px] font-semibold tracking-[-0.03em] text-[#1b3025]">{pageTitle}</h1></div>
+            </div>
+            <div className="relative z-[2] ml-4 flex shrink-0 items-center gap-2 border-l border-[#cddbd2] pl-3 sm:pl-4">
+              <Button variant="outline" size="icon" aria-label="Notificações" className="relative size-9 rounded-xl border-[#d5e0d9] bg-white/90 shadow-sm hover:bg-white"><Bell className="size-4" /><span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-[#ef6a5b] ring-2 ring-white" /></Button>
+              <Button onClick={() => setNewReportOpen(true)} className="h-9 rounded-xl bg-[#173e2c] px-3.5 text-white shadow-[0_8px_20px_-14px_#173e2c] hover:bg-[#24573f] sm:px-4"><Plus className="size-4" /><span className="hidden sm:inline">Novo report</span><span className="sm:hidden">Report</span></Button>
+            </div>
           </div>
         </header>
 
