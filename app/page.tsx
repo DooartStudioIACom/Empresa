@@ -7,13 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 
-const reports = [
-  { id: 'BUG-2026-014', title: 'Integração SEED-PR', client: 'Colégio Estadual Ivo Leão', copy: '109279', version: 'U+ 009/26', status: 'Novo report', tone: 'red', owner: 'JD', updated: 'há 18 min', attachments: 2 },
-  { id: 'TST-2026-009-03', title: 'Super Revisor — validação geral', client: 'Rodada interna de testes', copy: 'Horários grandes', version: 'U+ 009/26', status: 'Em teste', tone: 'blue', owner: 'BL', updated: 'há 42 min', attachments: 1 },
-  { id: 'BUG-2026-012', title: 'Perfis de acesso — acesso total', client: 'Rodada interna de testes', copy: 'Gerenciar usuários', version: 'U+ 009/26', status: 'Aguardando reteste', tone: 'amber', owner: 'GM', updated: 'ontem, 17:46', attachments: 3 },
-  { id: 'BUG-2026-008', title: 'Aviso de salas disponíveis', client: 'Controles · Recursos', copy: 'Validação do aviso', version: 'U+ 008/26', status: 'Corrigido', tone: 'green', owner: 'LS', updated: '30 jul, 14:20', attachments: 2 },
-];
-type ReportItem = (typeof reports)[number] & { canEdit?: boolean; isOwner?: boolean };
+type ReportItem = { id: string; title: string; client: string; copy: string; version: string; status: string; tone: string; owner: string; updated: string; attachments: number; urgent?: boolean; canEdit?: boolean; isOwner?: boolean };
+const initialReports: ReportItem[] = [];
 type ReportDetail = {
   report: Record<string, string | number | null>;
   attachments: Array<{ id: string; file_name: string; content_type: string; byte_size: number; kind: string; created_at: number }>;
@@ -43,9 +38,9 @@ const nav = [
 type SectionId = (typeof nav)[number]['id'];
 
 export default function Home() {
-  const [reportItems, setReportItems] = useState(reports);
+  const [reportItems, setReportItems] = useState<ReportItem[]>(initialReports);
   const [newReportOpen, setNewReportOpen] = useState(false);
-  const [selectedReport, setSelectedReport] = useState<(typeof reports)[number] | null>(null);
+  const [selectedReport, setSelectedReport] = useState<ReportItem | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ displayName: string; email: string } | null>(null);
@@ -241,9 +236,9 @@ export default function Home() {
           ); })}
         </nav>
         <div className="mx-3 mb-3 rounded-2xl border border-white/10 bg-white/[0.055] p-4">
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#d7ff66]">Rodada ativa</p><p className="mt-2 text-sm font-semibold">Testes U+ — 009/26</p>
-          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full w-[62%] rounded-full bg-[#d7ff66]" /></div>
-          <div className="mt-2 flex justify-between text-[11px] text-white/50"><span>5 itens</span><span>62%</span></div>
+          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#d7ff66]">Rodada ativa</p><p className="mt-2 text-sm font-semibold">{overviewRound?.title || 'Nenhuma rodada criada'}</p>
+          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10"><div style={{ width: `${overviewProgress}%` }} className="h-full rounded-full bg-[#d7ff66] transition-all" /></div>
+          <div className="mt-2 flex justify-between text-[11px] text-white/50"><span>{overviewRound?.items.length || 0} itens</span><span>{overviewProgress}%</span></div>
         </div>
         <button className="flex items-center gap-3 border-t border-white/10 px-5 py-5 text-left">
           <span className="grid size-8 place-items-center rounded-full bg-[#e7b68d] text-xs font-semibold text-[#4a2a14]">{userInitials}</span>
@@ -293,13 +288,14 @@ export default function Home() {
             <div className="divide-y divide-[#e9eeeb]">
               {reportItems.map((report) => (
                 <button onClick={() => openReport(report)} key={report.id} className="group grid w-full grid-cols-[1fr_auto] items-center gap-4 px-5 py-4 text-left transition hover:bg-[#f8faf9] md:grid-cols-[minmax(270px,1.45fr)_minmax(140px,.7fr)_130px_110px_24px]">
-                  <div className="min-w-0"><div className="flex items-center gap-2"><span className="font-mono text-[10px] font-semibold text-[#7b8981]">{report.id}</span>{report.id === 'BUG-2026-014' && <Badge className="h-[18px] bg-[#fff0ed] px-1.5 text-[9px] font-semibold text-[#b64738]">URGENTE</Badge>}</div><p className="mt-1 truncate text-[13px] font-semibold text-[#1d2e25]">{report.title}</p><p className="mt-1 truncate text-[11px] text-[#75847c]">{report.client} · {report.copy}</p></div>
+                  <div className="min-w-0"><div className="flex items-center gap-2"><span className="font-mono text-[10px] font-semibold text-[#7b8981]">{report.id}</span>{report.urgent && <Badge className="h-[18px] bg-[#fff0ed] px-1.5 text-[9px] font-semibold text-[#b64738]">URGENTE</Badge>}</div><p className="mt-1 truncate text-[13px] font-semibold text-[#1d2e25]">{report.title}</p><p className="mt-1 truncate text-[11px] text-[#75847c]">{report.client} · {report.copy}</p></div>
                   <div className="hidden md:block"><p className="text-[11px] font-medium text-[#3f5148]">{report.version}</p><div className="mt-1 flex items-center gap-1 text-[10px] text-[#849088]"><Paperclip className="size-3" />{report.attachments} anexos</div></div>
                   <div className="hidden md:block"><span className={`status status-${report.tone}`}><span />{report.status}</span></div>
                   <div className="flex items-center justify-end gap-2 md:justify-start"><span className="grid size-7 place-items-center rounded-full bg-[#e6ece8] text-[9px] font-semibold text-[#385144]">{report.owner}</span><span className="hidden text-[10px] text-[#849088] xl:block">{report.updated}</span></div>
                   <ChevronRight className="hidden size-4 text-[#a1ada6] transition group-hover:translate-x-0.5 group-hover:text-[#426653] md:block" />
                 </button>
               ))}
+              {reportItems.length === 0 && <div className="px-5 py-14 text-center"><span className="mx-auto grid size-12 place-items-center rounded-2xl bg-[#eef5f0] text-[#397657]"><Sparkles className="size-5" /></span><p className="mt-4 text-sm font-semibold text-[#263a2f]">Tudo pronto para começar</p><p className="mx-auto mt-1 max-w-md text-xs leading-5 text-[#7a8880]">Ainda não há atividade. O primeiro report ou a primeira rodada aparecerá aqui para toda a equipe.</p></div>}
             </div>
             <div className="border-t border-[#e4ebe7] bg-[#fafcfb] px-5 py-3 text-center"><button onClick={() => setActiveSection('reports')} className="text-[11px] font-semibold text-[#386349] hover:text-[#173e2c]">Ver todos os reports</button></div>
           </section>
@@ -425,7 +421,7 @@ function ReportsView({ reports, onSelect, onCreate }: { reports: ReportItem[]; o
       </div>
       <div className="hidden grid-cols-[1.4fr_.65fr_.6fr_.4fr] gap-4 border-b border-[#e9eeeb] bg-[#fafcfb] px-5 py-2.5 text-[9px] font-bold uppercase tracking-[.1em] text-[#829087] md:grid"><span>Report</span><span>Versão / anexos</span><span>Status</span><span>Responsável</span></div>
       <div className="divide-y divide-[#e9eeeb]">{filteredReports.map((report) => <button key={report.id} onClick={() => onSelect(report)} className="group grid w-full grid-cols-[1fr_auto] items-center gap-4 px-5 py-4 text-left hover:bg-[#f8faf9] md:grid-cols-[1.4fr_.65fr_.6fr_.4fr]">
-        <div className="min-w-0"><div className="flex items-center gap-2"><span className="font-mono text-[10px] font-semibold text-[#78877f]">{report.id}</span>{report.id === 'BUG-2026-014' && <Badge className="h-[18px] bg-[#fff0ed] px-1.5 text-[9px] text-[#b64738]">URGENTE</Badge>}{report.canEdit === false && <Badge className="h-[18px] bg-[#f0f2f1] px-1.5 text-[8px] text-[#6c7972]">LEITURA</Badge>}{report.canEdit && !report.isOwner && <Badge className="h-[18px] bg-[#edf7f0] px-1.5 text-[8px] text-[#377853]">COMPARTILHADO</Badge>}</div><p className="mt-1 truncate text-[13px] font-semibold">{report.title}</p><p className="mt-1 truncate text-[11px] text-[#75847c]">{report.client} · {report.copy}</p></div>
+        <div className="min-w-0"><div className="flex items-center gap-2"><span className="font-mono text-[10px] font-semibold text-[#78877f]">{report.id}</span>{report.urgent && <Badge className="h-[18px] bg-[#fff0ed] px-1.5 text-[9px] text-[#b64738]">URGENTE</Badge>}{report.canEdit === false && <Badge className="h-[18px] bg-[#f0f2f1] px-1.5 text-[8px] text-[#6c7972]">LEITURA</Badge>}{report.canEdit && !report.isOwner && <Badge className="h-[18px] bg-[#edf7f0] px-1.5 text-[8px] text-[#377853]">COMPARTILHADO</Badge>}</div><p className="mt-1 truncate text-[13px] font-semibold">{report.title}</p><p className="mt-1 truncate text-[11px] text-[#75847c]">{report.client} · {report.copy}</p></div>
         <div className="hidden md:block"><p className="text-[11px] font-medium">{report.version}</p><p className="mt-1 flex items-center gap-1 text-[10px] text-[#849088]"><Paperclip className="size-3" />{report.attachments} anexos</p></div>
         <div className="hidden md:block"><span className={`status status-${report.tone}`}><span />{report.status}</span></div>
         <div className="flex items-center justify-end gap-2 md:justify-start"><span className="grid size-7 place-items-center rounded-full bg-[#e6ece8] text-[9px] font-semibold text-[#385144]">{report.owner}</span><ChevronRight className="size-4 text-[#a1ada6] transition group-hover:translate-x-0.5" /></div>
@@ -559,24 +555,15 @@ function RoundsView() {
 }
 
 function VersionsView() {
-  const versions = [
-    { name: 'U+ 009/26', date: '03 ago 2026', status: 'Em testes', tone: 'blue', reports: '3 reports', notes: 'Super Revisor, perfis de acesso, aviso de recursos e melhorias de usabilidade.' },
-    { name: 'U+ 008/26', date: '30 jul 2026', status: 'Aprovada', tone: 'green', reports: '2 corrigidos', notes: 'Ajustes em Controles e melhorias na validação de salas.' },
-    { name: 'U+ 007/26', date: '17 jul 2026', status: 'Publicada', tone: 'green', reports: 'Sem pendências', notes: 'Correções gerais e melhorias de estabilidade.' },
-    { name: 'U+ 006/26', date: '03 jul 2026', status: 'Arquivada', tone: 'amber', reports: '4 corrigidos', notes: 'Ciclo encerrado e histórico preservado.' },
-  ];
   return <div><ViewHeading eyebrow="Histórico de entregas" title="Versões do U+" description="Veja o que mudou, os testes executados e os bugs relacionados a cada versão." action={<Button variant="outline"><Plus /> Registrar versão</Button>} />
-    <div className="mt-6 grid gap-3 sm:grid-cols-3"><MiniStat value="009/26" label="Versão em testes" tone="blue" /><MiniStat value="8" label="Versões em 2026" tone="green" /><MiniStat value="3" label="Pendências atuais" tone="amber" /></div>
-    <section className="mt-5 overflow-hidden rounded-2xl border border-[#dce5df] bg-white"><div className="border-b border-[#e4ebe7] px-5 py-4"><h2 className="text-sm font-semibold">Linha do tempo de versões</h2><p className="mt-1 text-xs text-[#78867e]">Da versão mais recente para a mais antiga</p></div><div className="divide-y divide-[#e9eeeb]">{versions.map((version, index) => <button key={version.name} className="grid w-full gap-3 px-5 py-5 text-left hover:bg-[#f8faf9] md:grid-cols-[55px_150px_1fr_120px_20px] md:items-center"><span className="relative grid size-10 place-items-center rounded-xl bg-[#eef4f0] text-[#3f6d54]"><Code2 className="size-4" />{index < versions.length - 1 && <span className="absolute left-1/2 top-10 hidden h-8 w-px bg-[#dce5df] md:block" />}</span><span><span className="block text-sm font-semibold">{version.name}</span><span className="mt-1 block text-[10px] text-[#849088]">{version.date}</span></span><span className="text-xs leading-5 text-[#5f7067]">{version.notes}</span><span><span className={`status status-${version.tone}`}><span />{version.status}</span><small className="mt-1.5 block text-[9px] text-[#89958e]">{version.reports}</small></span><ChevronRight className="size-4 text-[#a2ada7]" /></button>)}</div></section>
+    <div className="mt-6 grid gap-3 sm:grid-cols-3"><MiniStat value="0" label="Versões registradas" tone="blue" /><MiniStat value="0" label="Versões em testes" tone="green" /><MiniStat value="0" label="Pendências atuais" tone="amber" /></div>
+    <section className="mt-5 rounded-2xl border border-dashed border-[#cfdcd4] bg-white px-6 py-16 text-center"><span className="mx-auto grid size-12 place-items-center rounded-2xl bg-[#eef5f0] text-[#397657]"><Code2 className="size-5" /></span><h2 className="mt-4 text-sm font-semibold">Nenhuma versão registrada</h2><p className="mt-1 text-xs text-[#78867e]">A linha do tempo começará com a primeira versão cadastrada pela equipe.</p></section>
   </div>;
 }
 
 function TeamView({ currentUserName, currentUserInitials }: { currentUserName: string; currentUserInitials: string }) {
   const members = [
-    { name: currentUserName, role: 'Qualidade', initials: currentUserInitials, open: 4, color: '#d7ff66', current: true },
-    { name: 'Bruno Milfont', role: 'Gerência', initials: 'BM', open: 3, color: '#dce8ff' },
-    { name: 'George Martins', role: 'Desenvolvimento', initials: 'GM', open: 5, color: '#ffe5c9' },
-    { name: 'Jhoni Duarte', role: 'Suporte', initials: 'JD', open: 2, color: '#eadfff' },
+    { name: currentUserName, role: 'Primeiro acesso', initials: currentUserInitials, open: 0, color: '#d7ff66', current: true },
   ];
   return <div><ViewHeading eyebrow="Pessoas e responsabilidades" title="Equipe" description="Acompanhe quem reporta, corrige, testa e aprova cada chamado." action={<Button variant="outline"><UserPlus /> Adicionar pessoa</Button>} />
     <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{members.map((member) => <article key={member.name} className="rounded-2xl border border-[#dce5df] bg-white p-5"><div className="flex items-start justify-between"><span style={{ background: member.color }} className="grid size-11 place-items-center rounded-full text-xs font-bold text-[#294033]">{member.initials}</span>{member.current && <Badge className="bg-[#edf7f0] text-[#377853]">VOCÊ</Badge>}</div><h2 className="mt-4 text-sm font-semibold">{member.name}</h2><p className="mt-1 text-xs text-[#78867e]">{member.role}</p><div className="mt-4 flex items-center justify-between border-t border-[#edf1ef] pt-4"><span className="text-[10px] text-[#849088]">Chamados ativos</span><span className="text-sm font-semibold">{member.open}</span></div></article>)}</div>
@@ -653,7 +640,7 @@ function initials(name: string) {
 }
 function statusTone(status: string) { if (status === 'Corrigido') return 'green'; if (status === 'Aguardando reteste') return 'amber'; if (['Em análise', 'Em correção', 'Em teste'].includes(status)) return 'blue'; return 'red'; }
 function formatRoundDate(value: string) { const date = new Date(`${value}T12:00:00`); return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('pt-BR'); }
-function apiReportToItem(row: Record<string, unknown>): ReportItem { const email = String(row.author_email || 'EQ'); return { id: String(row.id), title: String(row.function_name || 'Report'), client: String(row.institution || 'Cliente não informado'), copy: String(row.copy_number || 'Sem cópia'), version: String(row.version || 'Sem versão'), status: String(row.status || 'Novo report'), tone: statusTone(String(row.status || 'Novo report')), owner: initials(email.includes('@') ? email.split('@')[0] : email).slice(0, 2), updated: formatDateTime(Number(row.updated_at || Date.now())), attachments: Number(row.attachment_count || 0), canEdit: Number(row.can_edit) === 1, isOwner: Number(row.is_owner) === 1 }; }
+function apiReportToItem(row: Record<string, unknown>): ReportItem { const email = String(row.author_email || 'EQ'); return { id: String(row.id), title: String(row.function_name || 'Report'), client: String(row.institution || 'Cliente não informado'), copy: String(row.copy_number || 'Sem cópia'), version: String(row.version || 'Sem versão'), status: String(row.status || 'Novo report'), tone: statusTone(String(row.status || 'Novo report')), owner: initials(email.includes('@') ? email.split('@')[0] : email).slice(0, 2), updated: formatDateTime(Number(row.updated_at || Date.now())), attachments: Number(row.attachment_count || 0), urgent: Number(row.urgent) === 1, canEdit: Number(row.can_edit) === 1, isOwner: Number(row.is_owner) === 1 }; }
 function formatDateTime(value: number) { return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value)); }
 function actorName(email: string) { const local = email.split('@')[0].replace(/[._-]+/g, ' '); return local.replace(/\b\w/g, (letter) => letter.toUpperCase()); }
 function formatBytes(bytes: number) { if (bytes < 1024) return `${bytes} B`; if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`; return `${(bytes / 1024 / 1024).toFixed(1)} MB`; }
