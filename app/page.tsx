@@ -592,10 +592,43 @@ function TeamView({ currentUserName, currentUserInitials }: { currentUserName: s
   const members = [
     { name: currentUserName, role: 'Primeiro acesso', initials: currentUserInitials, open: 0, color: '#d7ff66', current: true },
   ];
-  return <div><ViewHeading eyebrow="Pessoas e responsabilidades" title="Equipe" description="Acompanhe quem reporta, corrige, testa e aprova cada chamado." action={<Button variant="outline"><UserPlus /> Adicionar pessoa</Button>} />
-    <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{members.map((member) => <article key={member.name} className="rounded-2xl border border-[#dce5df] bg-white p-5"><div className="flex items-start justify-between"><span style={{ background: member.color }} className="grid size-11 place-items-center rounded-full text-xs font-bold text-[#294033]">{member.initials}</span>{member.current && <Badge className="bg-[#edf7f0] text-[#377853]">VOCÊ</Badge>}</div><h2 className="mt-4 text-sm font-semibold">{member.name}</h2><p className="mt-1 text-xs text-[#78867e]">{member.role}</p><div className="mt-4 flex items-center justify-between border-t border-[#edf1ef] pt-4"><span className="text-[10px] text-[#849088]">Chamados ativos</span><span className="text-sm font-semibold">{member.open}</span></div></article>)}</div>
-    <section className="mt-5 rounded-2xl border border-[#dce5df] bg-white p-5"><div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-xl bg-[#edf5f0] text-[#397657]"><ShieldCheck className="size-4" /></span><div><h2 className="text-sm font-semibold">Papéis no fluxo</h2><p className="mt-1 text-xs text-[#78867e]">Cada área participa em uma etapa clara do chamado.</p></div></div><div className="mt-5 grid gap-3 md:grid-cols-4">{[['Suporte','Registra o problema'],['Gerência','Prioriza e acompanha'],['Desenvolvimento','Analisa e corrige'],['Qualidade','Testa e encerra']].map(([role,description], index) => <div key={role} className="relative rounded-xl bg-[#f6f9f7] p-4"><span className="text-[10px] font-bold text-[#3e7657]">0{index + 1}</span><p className="mt-2 text-xs font-semibold">{role}</p><p className="mt-1 text-[10px] text-[#7c8a82]">{description}</p></div>)}</div></section>
+  return <div>
+    <div className="flex flex-col gap-3 rounded-2xl border border-[#d6e2da] bg-[linear-gradient(110deg,#ffffff_0%,#f4f8f5_100%)] px-4 py-3.5 shadow-[0_8px_24px_-25px_#173e2c] sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#e9f3ec] text-[#397657] ring-1 ring-[#d6e4da]"><Users className="size-4" /></span><p className="text-xs leading-5 text-[#68786f] sm:text-[13px]"><strong className="font-semibold text-[#30483a]">Organize as responsabilidades</strong> e acompanhe quem participa de cada etapa das rodadas e dos reports.</p></div>
+      <Button variant="outline" className="shrink-0 border-[#cbdad1] bg-white text-[#294c39] hover:bg-[#f3f8f5]"><UserPlus /> Adicionar pessoa</Button>
+    </div>
+
+    <section className="mt-4 rounded-2xl border border-[#dce5df] bg-white p-4 sm:p-5">
+      <div className="flex items-center justify-between gap-3"><div><p className="text-[9px] font-bold uppercase tracking-[.12em] text-[#4d7c61]">Equipe cadastrada</p><p className="mt-1 text-xs text-[#78867e]">Pessoas com acesso ao ambiente de qualidade.</p></div><Badge className="bg-[#edf5f0] text-[#397657]">{members.length} {members.length === 1 ? 'PESSOA' : 'PESSOAS'}</Badge></div>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{members.map((member) => <article key={member.name} className="rounded-2xl border border-[#dce5df] bg-[linear-gradient(145deg,#ffffff,#f7faf8)] p-4 shadow-[0_12px_30px_-28px_#173e2c]"><div className="flex items-start justify-between"><span style={{ background: member.color }} className="grid size-11 place-items-center rounded-xl text-xs font-bold text-[#294033] shadow-sm">{member.initials}</span>{member.current && <Badge className="bg-[#edf7f0] text-[#377853]">VOCÊ</Badge>}</div><h2 className="mt-4 text-sm font-semibold">{member.name}</h2><p className="mt-1 text-xs text-[#78867e]">{member.role}</p><div className="mt-4 flex items-center justify-between border-t border-[#e7ede9] pt-3"><span className="text-[10px] text-[#849088]">Chamados ativos</span><span className="text-sm font-semibold">{member.open}</span></div></article>)}</div>
+    </section>
+
+    <section className="mt-5 overflow-hidden rounded-[22px] border border-[#d4e0d8] bg-white shadow-[0_18px_50px_-42px_#173e2c]">
+      <div className="flex flex-col gap-3 border-b border-[#e2eae5] bg-[linear-gradient(110deg,#f7faf8,#edf5f0)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-[#173e2c] text-[#d7ff66]"><ShieldCheck className="size-4" /></span><div><h2 className="text-sm font-semibold text-[#263c30]">Fluxo da rodada de testes</h2><p className="mt-1 text-xs text-[#718078]">Da publicação da gerência até o encerramento ou reteste final.</p></div></div><Badge className="w-fit bg-white text-[#397657] ring-1 ring-[#d5e3da]">FLUXO OFICIAL</Badge></div>
+
+      <div className="p-4 sm:p-5">
+        <div className="grid items-stretch gap-2 lg:grid-cols-[1fr_auto_1fr_auto_1fr]">
+          <WorkflowStep number="01" role="Gerência" description="Publica a rodada e define os testes." icon={Users} />
+          <ChevronRight className="mx-auto hidden size-4 self-center text-[#7f998a] lg:block" />
+          <WorkflowStep number="02" role="Suporte" description="Executa os testes e registra os resultados." icon={ListChecks} />
+          <ChevronRight className="mx-auto hidden size-4 self-center text-[#7f998a] lg:block" />
+          <WorkflowStep number="03" role="Gerência" description="Analisa as respostas recebidas." icon={ShieldCheck} />
+        </div>
+
+        <div className="my-4 flex items-center gap-3"><span className="h-px flex-1 bg-[#e3eae6]" /><span className="rounded-full bg-[#f1f5f2] px-3 py-1 text-[9px] font-bold uppercase tracking-[.1em] text-[#6c7e74]">Resultado da análise</span><span className="h-px flex-1 bg-[#e3eae6]" /></div>
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          <div className="rounded-2xl border border-[#cbe2d3] bg-[#f2faf4] p-4"><div className="flex items-center gap-2"><span className="grid size-8 place-items-center rounded-lg bg-[#dcefe2] text-[#347650]"><CircleCheck className="size-4" /></span><div><p className="text-xs font-semibold text-[#2d6745]">Sem bug encontrado</p><p className="mt-0.5 text-[10px] text-[#688172]">A rodada termina na Gerência.</p></div></div><div className="mt-3 rounded-xl border border-[#d5e8db] bg-white p-3"><p className="text-[9px] font-bold uppercase tracking-[.1em] text-[#4b8060]">Encerramento</p><p className="mt-1 text-xs font-semibold">Gerência aprova e finaliza a rodada</p></div></div>
+
+          <div className="rounded-2xl border border-[#ead9b4] bg-[#fffbf2] p-4"><div className="flex items-center gap-2"><span className="grid size-8 place-items-center rounded-lg bg-[#ffedc8] text-[#98691a]"><Bug className="size-4" /></span><div><p className="text-xs font-semibold text-[#805b19]">Bug encontrado</p><p className="mt-0.5 text-[10px] text-[#87745a]">A correção segue até o reteste do Suporte.</p></div></div><div className="mt-3 grid items-stretch gap-2 sm:grid-cols-[1fr_auto_1fr_auto_1fr]"><WorkflowStep compact number="04" role="Desenvolvimento" description="Corrige o bug." icon={Code2} /><ChevronRight className="mx-auto hidden size-4 self-center text-[#b18b4d] sm:block" /><WorkflowStep compact number="05" role="Gerência" description="Valida a correção." icon={ShieldCheck} /><ChevronRight className="mx-auto hidden size-4 self-center text-[#b18b4d] sm:block" /><WorkflowStep compact number="06" role="Suporte" description="Retesta e conclui." icon={CircleCheck} /></div></div>
+        </div>
+      </div>
+    </section>
   </div>;
+}
+
+function WorkflowStep({ number, role, description, icon: Icon, compact = false }: { number: string; role: string; description: string; icon: typeof Users; compact?: boolean }) {
+  return <div className={`rounded-xl border border-[#dce5df] bg-white ${compact ? 'p-3' : 'p-4'} shadow-[0_10px_25px_-25px_#173e2c]`}><div className="flex items-center justify-between gap-2"><span className="text-[9px] font-bold text-[#4a7c5d]">{number}</span><Icon className="size-3.5 text-[#678474]" /></div><p className={`${compact ? 'mt-2 text-[11px]' : 'mt-3 text-xs'} font-semibold text-[#2e4136]`}>{role}</p><p className="mt-1 text-[9px] leading-4 text-[#7a8981]">{description}</p></div>;
 }
 
 function ViewHeading({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action: React.ReactNode }) { return <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[.13em] text-[#4f7b62]">{eyebrow}</p><h2 className="mt-2 text-2xl font-semibold tracking-[-.035em]">{title}</h2><p className="mt-1.5 max-w-2xl text-sm text-[#708078]">{description}</p></div>{action}</div>; }
