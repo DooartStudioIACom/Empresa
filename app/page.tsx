@@ -575,8 +575,15 @@ function RoundsView() {
 }
 
 function VersionsView() {
-  return <div><ViewHeading eyebrow="Histórico de entregas" title="Versões do U+" description="Veja o que mudou, os testes executados e os bugs relacionados a cada versão." action={<Button variant="outline"><Plus /> Registrar versão</Button>} />
-    <div className="mt-6 grid gap-3 sm:grid-cols-3"><MiniStat value="0" label="Versões registradas" tone="blue" /><MiniStat value="0" label="Versões em testes" tone="green" /><MiniStat value="0" label="Pendências atuais" tone="amber" /></div>
+  return <div>
+    <div className="flex flex-col gap-3 rounded-2xl border border-[#d6e2da] bg-[linear-gradient(110deg,#ffffff_0%,#f4f8f5_100%)] px-4 py-3.5 shadow-[0_8px_24px_-25px_#173e2c] sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#e9f3ec] text-[#397657] ring-1 ring-[#d6e4da]"><FileArchive className="size-4" /></span>
+        <p className="text-xs leading-5 text-[#68786f] sm:text-[13px]"><strong className="font-semibold text-[#30483a]">Centralize cada entrega</strong> com as alterações, os testes realizados e os reports relacionados em um único histórico.</p>
+      </div>
+      <Button variant="outline" className="shrink-0 border-[#cbdad1] bg-white text-[#294c39] hover:bg-[#f3f8f5]"><Plus /> Registrar versão</Button>
+    </div>
+    <div className="mt-4 grid gap-3 sm:grid-cols-3"><MiniStat value="0" label="Versões registradas" tone="blue" /><MiniStat value="0" label="Versões em testes" tone="green" /><MiniStat value="0" label="Pendências atuais" tone="amber" /></div>
     <section className="mt-5 rounded-2xl border border-dashed border-[#cfdcd4] bg-white px-6 py-16 text-center"><span className="mx-auto grid size-12 place-items-center rounded-2xl bg-[#eef5f0] text-[#397657]"><Code2 className="size-5" /></span><h2 className="mt-4 text-sm font-semibold">Nenhuma versão registrada</h2><p className="mt-1 text-xs text-[#78867e]">A linha do tempo começará com a primeira versão cadastrada pela equipe.</p></section>
   </div>;
 }
