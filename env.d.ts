@@ -1,5 +1,6 @@
 declare namespace Cloudflare {
   interface Env {
-    FILES: R2Bucket;
+    FILES: KVNamespace;
+    DEMO_SESSION_SECRET?: string;
   }
 }

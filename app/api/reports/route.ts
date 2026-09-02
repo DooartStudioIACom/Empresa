@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   try {
     const files = [...inlineImages.map((file) => ({ file, kind: 'inline' })), ...(hasBackup && backupFile ? [{ file: backupFile, kind: 'backup' }] : []), ...(hasAttachments ? screenshots.map((file) => ({ file, kind: 'screenshot' })) : [])];
     const rows: Array<{ id: string; key: string; file: File; kind: string }> = [];
-    for (const { file, kind } of files) { const attachmentId = crypto.randomUUID(), key = `reports/${id}/${attachmentId}-${safeName(file.name)}`; await env.FILES.put(key, file.stream(), { httpMetadata: { contentType: file.type || 'application/octet-stream' } }); storedKeys.push(key); rows.push({ id: attachmentId, key, file, kind }); }
+    for (const { file, kind } of files) { const attachmentId = crypto.randomUUID(), key = `reports/${id}/${attachmentId}-${safeName(file.name)}`; await env.FILES.put(key, file.stream()); storedKeys.push(key); rows.push({ id: attachmentId, key, file, kind }); }
     const inlineRows = rows.filter((row) => row.kind === 'inline');
     const description = JSON.stringify({ version: 1, blocks: descriptionDraft.map((block) => block.type === 'text' ? { type: 'text', value: block.value } : { type: 'image', attachmentId: inlineRows[block.fileIndex]?.id, caption: block.caption }) });
     await env.DB.batch([

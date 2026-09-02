@@ -48,7 +48,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (attachment) {
       const attachmentId = crypto.randomUUID();
       objectKey = `reports/${id}/${attachmentId}-${safeName(attachment.name)}`;
-      await env.FILES.put(objectKey, attachment.stream(), { httpMetadata: { contentType: attachment.type || 'application/octet-stream' } });
+      await env.FILES.put(objectKey, attachment.stream());
       statements.push(env.DB.prepare('INSERT INTO attachments (id,report_id,object_key,file_name,content_type,byte_size,kind,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(attachmentId, id, objectKey, attachment.name, attachment.type || 'application/octet-stream', attachment.size, 'response', now));
       statements.push(env.DB.prepare('INSERT INTO activities (id,report_id,actor_id,actor_email,action,message,created_at) VALUES (?,?,?,?,?,?,?)').bind(crypto.randomUUID(), id, user.userId, user.email, 'attachment_added', `Anexou ${attachment.name}.`, now + 1));
     }

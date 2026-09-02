@@ -49,6 +49,7 @@ export default function Home() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ displayName: string; email: string } | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [activeSection, setActiveSection] = useState<SectionId>('overview');
   const [hasBackup, setHasBackup] = useState(true);
   const [hasAttachments, setHasAttachments] = useState(true);
@@ -71,13 +72,14 @@ export default function Home() {
 
   useEffect(() => {
     fetch('/api/me')
-      .then((response) => response.ok ? response.json() : null)
+      .then(async (response) => response.ok ? await response.json() as { displayName: string; email: string } : null)
       .then((user) => user && setCurrentUser(user))
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setAuthReady(true));
     const syncDashboard = async () => {
       const [reportResponse, roundResponse] = await Promise.allSettled([fetch('/api/reports'), fetch('/api/rounds')]);
       let synced = false;
-      if (reportResponse.status === 'fulfilled' && reportResponse.value.ok) { const payload = await reportResponse.value.json(); setReportItems((payload.reports || []).map(apiReportToItem)); synced = true; }
+      if (reportResponse.status === 'fulfilled' && reportResponse.value.ok) { const payload = await reportResponse.value.json() as { reports?: Array<Record<string, unknown>> }; setReportItems((payload.reports || []).map(apiReportToItem)); synced = true; }
       if (roundResponse.status === 'fulfilled' && roundResponse.value.ok) { const payload = await roundResponse.value.json() as { rounds?: TestRound[] }; const loadedRounds = payload.rounds || []; setReportRounds(loadedRounds); setOverviewRound(loadedRounds.find((round) => round.status === 'Em andamento') || loadedRounds[0] || null); synced = true; }
       if (synced) setLastSync(new Date());
     };
@@ -89,8 +91,11 @@ export default function Home() {
 
   useEffect(() => {
     if (!newReportOpen) return;
-    fetch('/api/rounds').then((response) => response.ok ? response.json() : null).then((payload: { rounds?: TestRound[] } | null) => payload?.rounds && setReportRounds(payload.rounds)).catch(() => undefined);
+    fetch('/api/rounds').then(async (response) => response.ok ? await response.json() as { rounds?: TestRound[] } : null).then((payload) => payload?.rounds && setReportRounds(payload.rounds)).catch(() => undefined);
   }, [newReportOpen]);
+
+  if (!authReady) return <AccessGate loading />;
+  if (!currentUser) return <AccessGate />;
 
   const userName = friendlyName(currentUser?.displayName, currentUser?.email);
   const userInitials = initials(userName);
@@ -580,6 +585,21 @@ function TeamView({ currentUserName, currentUserInitials }: { currentUserName: s
 }
 
 function ViewHeading({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action: React.ReactNode }) { return <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[.13em] text-[#4f7b62]">{eyebrow}</p><h2 className="mt-2 text-2xl font-semibold tracking-[-.035em]">{title}</h2><p className="mt-1.5 max-w-2xl text-sm text-[#708078]">{description}</p></div>{action}</div>; }
+function AccessGate({ loading = false }: { loading?: boolean }) {
+  const [email, setEmail] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  async function signIn(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setSubmitting(true); setError('');
+    try {
+      const response = await fetch('/api/demo-login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) });
+      const payload = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(payload.error || 'Não foi possível entrar');
+      window.location.reload();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Não foi possível entrar'); setSubmitting(false); }
+  }
+  return <main className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top,#edf6f0_0%,#f7f9f7_45%,#eef2ef_100%)] p-5"><section className="w-full max-w-md overflow-hidden rounded-[28px] border border-white bg-white shadow-[0_30px_90px_-48px_#173e2c]"><div className="h-1.5 bg-[linear-gradient(90deg,#173e2c,#5a916b,#d7ff66)]" /><div className="p-7 sm:p-9"><div className="flex items-center gap-3"><span className="grid size-12 place-items-center rounded-2xl bg-[#173e2c] text-[#d7ff66] shadow-[0_12px_30px_-18px_#173e2c]"><ShieldCheck className="size-5" /></span><div><p className="text-[9px] font-bold uppercase tracking-[.14em] text-[#5b8069]">GEHA Resolve</p><h1 className="mt-1 text-xl font-semibold tracking-[-.03em] text-[#1f3328]">Acesso corporativo</h1></div></div>{loading ? <div className="mt-8 flex items-center gap-3 rounded-2xl bg-[#f4f7f5] p-4 text-xs text-[#65756c]"><LoaderCircle className="size-4 animate-spin text-[#397657]" /> Verificando sua sessão segura...</div> : <><p className="mt-7 text-sm leading-6 text-[#5e6e65]">Ambiente privado de demonstração. Use um e-mail corporativo autorizado para acessar.</p><form onSubmit={signIn} className="mt-5"><label className="mb-2 block text-[10px] font-bold uppercase tracking-[.12em] text-[#617469]">E-mail corporativo</label><Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="seu.nome@geha.com.br" required className="h-12 rounded-xl border-[#dbe6df] bg-[#f7faf8]" />{error ? <p className="mt-2 text-xs font-medium text-red-600">{error}</p> : null}<button type="submit" disabled={submitting} className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#173e2c] text-xs font-semibold text-white shadow-sm transition hover:bg-[#24573f] disabled:opacity-60">{submitting ? <LoaderCircle className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />} Entrar na demonstração</button></form><div className="mt-5 flex justify-center gap-2 text-[9px] font-semibold text-[#5b8069]"><span>@geha.com.br</span><span>•</span><span>@horario.com.br</span></div><p className="mt-4 rounded-xl bg-[#f3f7f4] px-3 py-2 text-center text-[9px] leading-4 text-[#7b8981]">Modo demonstração · a confirmação por código será ativada no servidor oficial.</p></>}</div></section></main>;
+}
 function ReportMetric({ icon: Icon, label, value, tone }: { icon: typeof ShieldCheck; label: string; value: string; tone: 'green' | 'red' | 'blue' | 'amber' }) {
   const palette = tone === 'red' ? 'bg-[#fff0ed] text-[#a94a3c]' : tone === 'blue' ? 'bg-[#edf4fb] text-[#4775a0]' : tone === 'amber' ? 'bg-[#fff7e8] text-[#9a6a18]' : 'bg-[#eaf5ed] text-[#397657]';
   return <article className="flex min-w-0 items-center gap-3 rounded-2xl border border-[#dde6e0] bg-white p-3.5 shadow-[0_10px_30px_-28px_#173e2c]"><span className={`grid size-9 shrink-0 place-items-center rounded-xl ${palette}`}><Icon className="size-4" /></span><span className="min-w-0"><span className="block text-[8px] font-bold uppercase tracking-[.1em] text-[#87948d]">{label}</span><span className="mt-1 block truncate text-[11px] font-semibold text-[#34473d]">{value}</span></span></article>;

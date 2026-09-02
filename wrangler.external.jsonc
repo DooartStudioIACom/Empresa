@@ -1,0 +1,44 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "geha-resolve",
+  "main": "./dist/server/index.js",
+  "base_dir": "./dist/server",
+  "compatibility_date": "2026-09-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "no_bundle": true,
+  "workers_dev": true,
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "geha-resolve-db",
+      "database_id": "fb812314-7e30-4807-ae2c-75a06563ce79"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "FILES",
+      "id": "ac68089a09f6485ca897df3b33f57e99"
+    }
+  ],
+  "vars": {
+    "APP_AUTH_PROVIDER": "demo-cookie",
+    "ALLOWED_EMAIL_DOMAINS": "geha.com.br,horario.com.br"
+  },
+  "rules": [
+    {
+      "type": "ESModule",
+      "globs": ["**/*.js", "**/*.mjs"]
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    }
+  }
+}
