@@ -423,7 +423,7 @@ function ReportsView({ reports, onSelect }: { reports: ReportItem[]; onSelect: (
     return matchesQuery && matchesFilter;
   });
   return <div>
-    <ViewHeading eyebrow="Central de chamados" title="Todos os reports" description="Acompanhe cada problema desde o envio do Suporte até o reteste final." action={null} />
+    <p className="max-w-3xl text-sm leading-6 text-[#62736a]">Acompanhe cada report do registro inicial à análise, correção e validação final, com todo o histórico centralizado.</p>
     <div className="mt-6 grid gap-3 sm:grid-cols-3"><MiniStat value={String(reports.filter((report) => report.status !== 'Corrigido').length)} label="Reports abertos" tone="red" /><MiniStat value={String(reports.filter((report) => report.status === 'Aguardando reteste').length)} label="Aguardando reteste" tone="amber" /><MiniStat value={String(reports.filter((report) => report.status === 'Corrigido').length)} label="Reports corrigidos" tone="green" /></div>
     <section className="mt-5 overflow-hidden rounded-2xl border border-[#dce5df] bg-white">
       <div className="flex flex-col gap-3 border-b border-[#e4ebe7] p-4 sm:flex-row sm:items-center sm:justify-between">
