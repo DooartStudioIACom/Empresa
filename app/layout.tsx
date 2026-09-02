@@ -9,6 +9,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.SITE_URL ?? 'http://localhost:3000'),
   title: 'The Bugs on the Table — Qualidade & Produto',
   description: 'Reports, testes, correções e versões do U+ em um único lugar.',
+  icons: { icon: '/brand/bugs-on-the-table-logo.png', shortcut: '/brand/bugs-on-the-table-logo.png' },
   openGraph: {
     title: 'The Bugs on the Table — Qualidade & Produto',
     description: 'Reports, testes e correções em um só lugar.',
