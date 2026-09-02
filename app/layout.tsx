@@ -7,16 +7,16 @@ const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin']
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.SITE_URL ?? 'http://localhost:3000'),
-  title: 'GEHA Resolve — Qualidade & Produto',
+  title: 'The Bugs on the Table — Qualidade & Produto',
   description: 'Reports, testes, correções e versões do U+ em um único lugar.',
   openGraph: {
-    title: 'GEHA Resolve — Qualidade & Produto',
+    title: 'The Bugs on the Table — Qualidade & Produto',
     description: 'Reports, testes e correções em um só lugar.',
-    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'GEHA Resolve' }],
+    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'The Bugs on the Table' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'GEHA Resolve — Qualidade & Produto',
+    title: 'The Bugs on the Table — Qualidade & Produto',
     description: 'Reports, testes e correções em um só lugar.',
     images: ['/og.png'],
   },
