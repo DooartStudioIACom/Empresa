@@ -308,7 +308,7 @@ export default function Home() {
             </section>
             <section className="relative min-h-[190px] overflow-hidden rounded-2xl border border-[#dce5df] bg-[linear-gradient(145deg,#fffdf5,#f0f8f3)] p-5 shadow-[0_4px_18px_rgb(16_39_29/4%)]"><div className="relative z-[1] max-w-[62%]"><p className="text-[10px] font-bold uppercase tracking-[.13em] text-[#7b6b35]">Dica da vez</p><h2 className="mt-3 text-[15px] font-semibold">Teste com contexto</h2><p className="mt-2 text-xs leading-5 text-[#66766d]">{qualityTips[tipIndex]}</p><div className="mt-4 flex gap-1">{qualityTips.map((_, index) => <span key={index} className={`h-1.5 rounded-full transition-all ${index === tipIndex ? 'w-5 bg-[#6d8f48]' : 'w-1.5 bg-[#d7dfd8]'}`} />)}</div></div><img src="/dashboard/quality-tip.png" alt="Ilustração de dica de qualidade" className="absolute -bottom-8 -right-9 h-[190px] w-[190px] object-contain drop-shadow-[0_14px_24px_rgb(23_62_44/18%)]" /></section>
           </div>
-          </> : activeSection === 'reports' ? <ReportsView reports={reportItems} onSelect={openReport} onCreate={() => setNewReportOpen(true)} /> : activeSection === 'rounds' ? <RoundsView /> : activeSection === 'versions' ? <VersionsView /> : <TeamView currentUserName={currentUser?.displayName || userName} currentUserInitials={userInitials} />}
+          </> : activeSection === 'reports' ? <ReportsView reports={reportItems} onSelect={openReport} /> : activeSection === 'rounds' ? <RoundsView /> : activeSection === 'versions' ? <VersionsView /> : <TeamView currentUserName={currentUser?.displayName || userName} currentUserInitials={userInitials} />}
         </div>
       </main>
 
@@ -402,7 +402,7 @@ export default function Home() {
   );
 }
 
-function ReportsView({ reports, onSelect, onCreate }: { reports: ReportItem[]; onSelect: (report: ReportItem) => void; onCreate: () => void }) {
+function ReportsView({ reports, onSelect }: { reports: ReportItem[]; onSelect: (report: ReportItem) => void }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('Todos');
   const filteredReports = reports.filter((report) => {
@@ -412,7 +412,7 @@ function ReportsView({ reports, onSelect, onCreate }: { reports: ReportItem[]; o
     return matchesQuery && matchesFilter;
   });
   return <div>
-    <ViewHeading eyebrow="Central de chamados" title="Todos os reports" description="Acompanhe cada problema desde o envio do Suporte até o reteste final." action={<Button onClick={onCreate} className="bg-[#173e2c] text-white"><Plus /> Novo report</Button>} />
+    <ViewHeading eyebrow="Central de chamados" title="Todos os reports" description="Acompanhe cada problema desde o envio do Suporte até o reteste final." action={null} />
     <div className="mt-6 grid gap-3 sm:grid-cols-3"><MiniStat value={String(reports.filter((report) => report.status !== 'Corrigido').length)} label="Reports abertos" tone="red" /><MiniStat value={String(reports.filter((report) => report.status === 'Aguardando reteste').length)} label="Aguardando reteste" tone="amber" /><MiniStat value={String(reports.filter((report) => report.status === 'Corrigido').length)} label="Reports corrigidos" tone="green" /></div>
     <section className="mt-5 overflow-hidden rounded-2xl border border-[#dce5df] bg-white">
       <div className="flex flex-col gap-3 border-b border-[#e4ebe7] p-4 sm:flex-row sm:items-center sm:justify-between">
