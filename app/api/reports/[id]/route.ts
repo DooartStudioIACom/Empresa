@@ -13,11 +13,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   const report = await env.DB.prepare('SELECT * FROM reports WHERE id = ?').bind(id).first();
   if (!report) return Response.json({ error: 'Report não encontrado' }, { status: 404 });
+  const isOwner = report.author_id === user.userId;
+  const shared = isOwner ? true : Boolean(await env.DB.prepare('SELECT 1 FROM report_shares WHERE report_id=? AND lower(user_email)=lower(?)').bind(id, user.email).first());
   const [attachments, activities] = await Promise.all([
     env.DB.prepare('SELECT id, file_name, content_type, byte_size, kind, created_at FROM attachments WHERE report_id = ? ORDER BY created_at ASC').bind(id).all(),
     env.DB.prepare('SELECT id, actor_email, action, message, created_at FROM activities WHERE report_id = ? ORDER BY created_at ASC').bind(id).all(),
   ]);
-  return Response.json({ report, attachments: attachments.results, activities: activities.results });
+  const shares = isOwner ? await env.DB.prepare('SELECT user_email,permission,created_at FROM report_shares WHERE report_id=? ORDER BY created_at').bind(id).all() : { results: [] };
+  return Response.json({ report, attachments: attachments.results, activities: activities.results, permissions: { isOwner, canEdit: isOwner || shared }, shares: shares.results });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -25,8 +28,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!user) return Response.json({ error: 'Não autenticado' }, { status: 401 });
   await ensureDatabase();
   const { id } = await params;
-  const existing = await env.DB.prepare('SELECT id, status FROM reports WHERE id = ?').bind(id).first<{ id: string; status: string }>();
+  const existing = await env.DB.prepare('SELECT id, status, author_id FROM reports WHERE id = ?').bind(id).first<{ id: string; status: string; author_id: string }>();
   if (!existing) return Response.json({ error: 'Report não encontrado' }, { status: 404 });
+  const canEdit = existing.author_id === user.userId || Boolean(await env.DB.prepare('SELECT 1 FROM report_shares WHERE report_id=? AND lower(user_email)=lower(?)').bind(id, user.email).first());
+  if (!canEdit) return Response.json({ error: 'Este report está disponível somente para leitura. O autor precisa compartilhar a edição com você.' }, { status: 403 });
   const data = await request.formData();
   const message = field(data, 'message');
   const requestedStatus = field(data, 'status');

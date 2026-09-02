@@ -9,7 +9,7 @@ const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 export async function GET() {
   const user = await getChatGPTUser(); if (!user) return Response.json({ error: 'Não autenticado' }, { status: 401 });
   await ensureDatabase();
-  const result = await env.DB.prepare(`SELECT r.id, r.function_name, r.institution, r.copy_number, r.version, r.status, r.urgent, r.author_email, r.updated_at, COUNT(a.id) AS attachment_count FROM reports r LEFT JOIN attachments a ON a.report_id = r.id GROUP BY r.id ORDER BY r.updated_at DESC LIMIT 100`).all();
+  const result = await env.DB.prepare(`SELECT r.id, r.function_name, r.institution, r.copy_number, r.version, r.status, r.urgent, r.author_email, r.updated_at, COUNT(a.id) AS attachment_count, CASE WHEN r.author_id=? THEN 1 ELSE 0 END AS is_owner, CASE WHEN r.author_id=? OR EXISTS (SELECT 1 FROM report_shares s WHERE s.report_id=r.id AND lower(s.user_email)=lower(?)) THEN 1 ELSE 0 END AS can_edit FROM reports r LEFT JOIN attachments a ON a.report_id = r.id GROUP BY r.id ORDER BY r.updated_at DESC LIMIT 100`).bind(user.userId, user.userId, user.email).all();
   return Response.json({ reports: result.results });
 }
 

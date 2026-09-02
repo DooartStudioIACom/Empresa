@@ -13,11 +13,13 @@ const reports = [
   { id: 'BUG-2026-012', title: 'Perfis de acesso — acesso total', client: 'Rodada interna de testes', copy: 'Gerenciar usuários', version: 'U+ 009/26', status: 'Aguardando reteste', tone: 'amber', owner: 'GM', updated: 'ontem, 17:46', attachments: 3 },
   { id: 'BUG-2026-008', title: 'Aviso de salas disponíveis', client: 'Controles · Recursos', copy: 'Validação do aviso', version: 'U+ 008/26', status: 'Corrigido', tone: 'green', owner: 'LS', updated: '30 jul, 14:20', attachments: 2 },
 ];
-type ReportItem = (typeof reports)[number];
+type ReportItem = (typeof reports)[number] & { canEdit?: boolean; isOwner?: boolean };
 type ReportDetail = {
   report: Record<string, string | number | null>;
   attachments: Array<{ id: string; file_name: string; content_type: string; byte_size: number; kind: string; created_at: number }>;
   activities: Array<{ id: string; actor_email: string; action: string; message: string | null; created_at: number }>;
+  permissions?: { isOwner: boolean; canEdit: boolean };
+  shares?: Array<{ user_email: string; permission: string; created_at: number }>;
 };
 type ReportEditorBlock = { key: number; type: 'text'; value: string } | { key: number; type: 'image'; file: File; preview: string; caption: string };
 type TestRoundItem = { id: string; round_id: string; position: number; title: string; path: string | null; description: string | null; status: string; tester_email: string | null; tester_name?: string | null; result_note: string | null; updated_at: number; response_updated_at?: number | null };
@@ -59,6 +61,8 @@ export default function Home() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [replying, setReplying] = useState(false);
   const [replyNotice, setReplyNotice] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const [shareNotice, setShareNotice] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [overviewRound, setOverviewRound] = useState<TestRound | null>(null);
   const [lastSync, setLastSync] = useState<Date | null>(null);
@@ -135,6 +139,7 @@ export default function Home() {
         version: String(data.get('version') || 'Sem versão'),
         status: 'Novo report', tone: 'red', owner: userInitials, updated: 'agora',
         attachments: (hasBackup ? 1 : 0) + (hasAttachments ? data.getAll('screenshots').filter((file) => file instanceof File && file.size > 0).length : 0) + data.getAll('inlineImages').filter((file) => file instanceof File && file.size > 0).length,
+        canEdit: true, isOwner: true,
       }, ...current]);
       setSaved(true);
       form.reset();
@@ -157,6 +162,7 @@ export default function Home() {
     setSelectedReport(report);
     setReportDetail(null);
     setReplyNotice(null);
+    setShareNotice(null);
     setDetailLoading(true);
     try {
       const response = await fetch(`/api/reports/${encodeURIComponent(report.id)}`);
@@ -190,6 +196,27 @@ export default function Home() {
     } finally {
       setReplying(false);
     }
+  }
+
+  async function updateShare(email: string, action: 'add' | 'remove' = 'add') {
+    if (!selectedReport) return;
+    setSharing(true); setShareNotice(null);
+    try {
+      const response = await fetch(`/api/reports/${encodeURIComponent(selectedReport.id)}/share`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, action }) });
+      const payload = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(payload.error || 'Não foi possível alterar o compartilhamento.');
+      const detailResponse = await fetch(`/api/reports/${encodeURIComponent(selectedReport.id)}`);
+      if (detailResponse.ok) setReportDetail(await detailResponse.json());
+      setShareNotice({ tone: 'success', message: action === 'remove' ? 'Permissão removida.' : 'Edição compartilhada com sucesso.' });
+    } catch (error) { setShareNotice({ tone: 'error', message: error instanceof Error ? error.message : 'Não foi possível compartilhar.' }); }
+    finally { setSharing(false); }
+  }
+
+  async function shareReport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget, data = new FormData(form), email = String(data.get('shareEmail') || '').trim();
+    await updateShare(email);
+    if (email) form.reset();
   }
 
   return (
@@ -328,7 +355,7 @@ export default function Home() {
         <DialogContent className="max-h-[92vh] overflow-y-auto p-0 sm:max-w-3xl">
           {selectedReport && <>
             <DialogHeader className="border-b border-[#e4ebe7] px-6 py-5">
-              <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-[11px] font-semibold text-[#75847c]">{selectedReport.id}</span><span className={`status status-${selectedReport.tone}`}><span />{selectedReport.status}</span></div>
+              <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-[11px] font-semibold text-[#75847c]">{selectedReport.id}</span><span className={`status status-${selectedReport.tone}`}><span />{selectedReport.status}</span>{reportDetail?.permissions && <Badge className={reportDetail.permissions.canEdit ? 'bg-[#edf7f0] text-[#377853]' : 'bg-[#f0f2f1] text-[#69776f]'}>{reportDetail.permissions.isOwner ? 'SEU REPORT' : reportDetail.permissions.canEdit ? 'EDIÇÃO COMPARTILHADA' : 'SOMENTE LEITURA'}</Badge>}</div>
               <DialogTitle className="mt-2 text-xl">{selectedReport.title}</DialogTitle><DialogDescription>{String(reportDetail?.report.institution || selectedReport.client)} · Cópia {String(reportDetail?.report.copy_number || selectedReport.copy)} · {String(reportDetail?.report.version || selectedReport.version)}</DialogDescription>
             </DialogHeader>
             {detailLoading && <div className="flex items-center justify-center gap-2 py-12 text-xs text-[#718078]"><LoaderCircle className="size-4 animate-spin" /> Carregando report...</div>}
@@ -339,9 +366,9 @@ export default function Home() {
                 <div><p className="detail-label">Linha do tempo</p><div className="mt-3 space-y-4 border-l border-[#dce5df] pl-5">
                   {reportDetail?.activities.length ? reportDetail.activities.map((activity) => <Timeline key={activity.id} name={actorName(activity.actor_email)} role={activity.action === 'status_update' ? 'Atualização de status' : activity.action === 'attachment_added' ? 'Anexo' : 'Equipe'} time={formatDateTime(activity.created_at)} text={activity.message || 'Atualização registrada.'} highlighted={activity.action === 'status_update'} />) : <Timeline name="Equipe GEHA" role="Suporte" time="Histórico inicial" text="Report registrado para análise da equipe." />}
                 </div></div>
-                {reportDetail && <form onSubmit={sendReply} className="rounded-xl border border-[#dce5df] p-3"><Textarea name="message" placeholder="Escreva uma resposta ou o resultado do reteste..." className="min-h-20 border-0 p-1 shadow-none focus-visible:ring-0" /><div className="mt-2 grid gap-2 border-t border-[#edf1ef] pt-3 sm:grid-cols-[1fr_180px_auto]"><Input name="attachment" type="file" className="h-8 text-[10px]" aria-label="Anexar arquivo à resposta" /><select name="status" defaultValue={selectedReport.status} className="form-select"><option>Novo report</option><option>Em análise</option><option>Em correção</option><option>Aguardando reteste</option><option>Corrigido</option><option>Ainda ocorre</option></select><Button type="submit" disabled={replying} size="sm" className="bg-[#173e2c] text-white">{replying ? <LoaderCircle className="animate-spin" /> : <MessageSquareText />} {replying ? 'Enviando...' : 'Responder'}</Button></div>{replyNotice && <div role="status" className={`mt-3 rounded-lg border px-3 py-2 text-[11px] ${replyNotice.tone === 'success' ? 'border-[#bfddc9] bg-[#eef8f1] text-[#2f7048]' : 'border-[#efc3bb] bg-[#fff2ef] text-[#9e3e31]'}`}>{replyNotice.message}</div>}</form>}
+                {reportDetail?.permissions?.canEdit ? <form onSubmit={sendReply} className="rounded-xl border border-[#dce5df] p-3"><Textarea name="message" placeholder="Escreva uma resposta ou o resultado do reteste..." className="min-h-20 border-0 p-1 shadow-none focus-visible:ring-0" /><div className="mt-2 grid gap-2 border-t border-[#edf1ef] pt-3 sm:grid-cols-[1fr_180px_auto]"><Input name="attachment" type="file" className="h-8 text-[10px]" aria-label="Anexar arquivo à resposta" /><select name="status" defaultValue={selectedReport.status} className="form-select"><option>Novo report</option><option>Em análise</option><option>Em correção</option><option>Aguardando reteste</option><option>Corrigido</option><option>Ainda ocorre</option></select><Button type="submit" disabled={replying} size="sm" className="bg-[#173e2c] text-white">{replying ? <LoaderCircle className="animate-spin" /> : <MessageSquareText />} {replying ? 'Enviando...' : 'Responder'}</Button></div>{replyNotice && <div role="status" className={`mt-3 rounded-lg border px-3 py-2 text-[11px] ${replyNotice.tone === 'success' ? 'border-[#bfddc9] bg-[#eef8f1] text-[#2f7048]' : 'border-[#efc3bb] bg-[#fff2ef] text-[#9e3e31]'}`}>{replyNotice.message}</div>}</form> : reportDetail && <div className="flex items-start gap-3 rounded-xl border border-[#dce5df] bg-[#f6f8f7] p-4"><ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#728078]" /><div><p className="text-xs font-semibold">Report disponível somente para leitura</p><p className="mt-1 text-[10px] leading-4 text-[#74837b]">Você pode acompanhar todas as informações, mas somente o autor ou pessoas autorizadas podem responder, anexar arquivos e alterar o status.</p></div></div>}
               </div>
-              <aside className="space-y-4">{Number(reportDetail?.report.from_test_round) === 1 && <section className="rounded-xl border border-[#cfe0d5] bg-[#f2f8f4] p-4"><div className="flex items-center gap-2"><ListChecks className="size-4 text-[#397657]" /><p className="detail-label text-[#397657]">Bug de rodada</p></div><p className="mt-3 text-xs font-semibold">{String(reportDetail?.report.test_round_title || '')}</p><p className="mt-1 text-[10px] text-[#718078]">{String(reportDetail?.report.test_round_version || '')}</p><div className="mt-3 rounded-lg bg-white px-3 py-2"><p className="text-[9px] font-semibold uppercase text-[#849088]">Teste relacionado</p><p className="mt-1 text-[10px] font-semibold text-[#405449]">{String(reportDetail?.report.test_item_title || '')}</p></div></section>}<InfoCard label="Responsável" value="Desenvolvimento" /><InfoCard label="Urgência" value={Number(reportDetail?.report.urgent) === 1 ? 'Sim — prioritário' : 'Normal'} /><InfoCard label="Ambiente beta" value={String(reportDetail?.report.beta_status || 'Não testado')} />{reportDetail && <><InfoCard label="Possui cópia?" value={reportDetail.attachments.some((file) => file.kind === 'backup') ? 'Sim' : 'Não'} /><InfoCard label="Possui anexos?" value={reportDetail.attachments.some((file) => file.kind !== 'backup') ? 'Sim' : 'Não'} /></>}<div><p className="detail-label">Arquivos</p><div className="mt-2 space-y-2">{reportDetail?.attachments.length ? reportDetail.attachments.map((file) => <Attachment key={file.id} id={file.id} name={file.file_name} size={formatBytes(file.byte_size)} csv={file.kind === 'backup'} />) : <p className="rounded-lg bg-[#f4f7f5] p-3 text-[10px] text-[#7b8981]">Nenhum arquivo anexado.</p>}</div></div></aside>
+              <aside className="space-y-4">{reportDetail?.permissions?.isOwner && <section className="rounded-xl border border-[#cfe0d5] bg-[#f4f9f5] p-4"><div className="flex items-center gap-2"><Users className="size-4 text-[#397657]" /><p className="detail-label text-[#397657]">Compartilhar edição</p></div><p className="mt-2 text-[10px] leading-4 text-[#6f7f76]">A pessoa poderá responder, anexar arquivos e alterar o status.</p><form onSubmit={shareReport} className="mt-3 flex gap-2"><Input name="shareEmail" type="email" required placeholder="email@empresa.com" className="h-8 bg-white text-[10px]" /><Button type="submit" disabled={sharing} size="sm" className="h-8 bg-[#173e2c] px-3 text-white">{sharing ? <LoaderCircle className="animate-spin" /> : <Plus />} Liberar</Button></form>{shareNotice && <p className={`mt-2 text-[9px] ${shareNotice.tone === 'success' ? 'text-[#397657]' : 'text-[#a64b3e]'}`}>{shareNotice.message}</p>}<div className="mt-3 space-y-2">{reportDetail.shares?.map((share) => <div key={share.user_email} className="flex items-center gap-2 rounded-lg bg-white px-2.5 py-2"><span className="grid size-6 place-items-center rounded-full bg-[#eaf2ed] text-[8px] font-bold text-[#3e6f52]">{initials(share.user_email.split('@')[0])}</span><span className="min-w-0 flex-1 truncate text-[9px] text-[#53655b]">{share.user_email}</span><button type="button" onClick={() => updateShare(share.user_email, 'remove')} disabled={sharing} className="text-[8px] font-semibold text-[#a64b3e]">Remover</button></div>)}{!reportDetail.shares?.length && <p className="text-[9px] text-[#8a968f]">Ainda não compartilhado.</p>}</div></section>}{Number(reportDetail?.report.from_test_round) === 1 && <section className="rounded-xl border border-[#cfe0d5] bg-[#f2f8f4] p-4"><div className="flex items-center gap-2"><ListChecks className="size-4 text-[#397657]" /><p className="detail-label text-[#397657]">Bug de rodada</p></div><p className="mt-3 text-xs font-semibold">{String(reportDetail?.report.test_round_title || '')}</p><p className="mt-1 text-[10px] text-[#718078]">{String(reportDetail?.report.test_round_version || '')}</p><div className="mt-3 rounded-lg bg-white px-3 py-2"><p className="text-[9px] font-semibold uppercase text-[#849088]">Teste relacionado</p><p className="mt-1 text-[10px] font-semibold text-[#405449]">{String(reportDetail?.report.test_item_title || '')}</p></div></section>}<InfoCard label="Responsável" value="Desenvolvimento" /><InfoCard label="Urgência" value={Number(reportDetail?.report.urgent) === 1 ? 'Sim — prioritário' : 'Normal'} /><InfoCard label="Ambiente beta" value={String(reportDetail?.report.beta_status || 'Não testado')} />{reportDetail && <><InfoCard label="Possui cópia?" value={reportDetail.attachments.some((file) => file.kind === 'backup') ? 'Sim' : 'Não'} /><InfoCard label="Possui anexos?" value={reportDetail.attachments.some((file) => file.kind !== 'backup') ? 'Sim' : 'Não'} /></>}<div><p className="detail-label">Arquivos</p><div className="mt-2 space-y-2">{reportDetail?.attachments.length ? reportDetail.attachments.map((file) => <Attachment key={file.id} id={file.id} name={file.file_name} size={formatBytes(file.byte_size)} csv={file.kind === 'backup'} />) : <p className="rounded-lg bg-[#f4f7f5] p-3 text-[10px] text-[#7b8981]">Nenhum arquivo anexado.</p>}</div></div></aside>
             </div>}
           </>}
         </DialogContent>
@@ -369,7 +396,7 @@ function ReportsView({ reports, onSelect, onCreate }: { reports: ReportItem[]; o
       </div>
       <div className="hidden grid-cols-[1.4fr_.65fr_.6fr_.4fr] gap-4 border-b border-[#e9eeeb] bg-[#fafcfb] px-5 py-2.5 text-[9px] font-bold uppercase tracking-[.1em] text-[#829087] md:grid"><span>Report</span><span>Versão / anexos</span><span>Status</span><span>Responsável</span></div>
       <div className="divide-y divide-[#e9eeeb]">{filteredReports.map((report) => <button key={report.id} onClick={() => onSelect(report)} className="group grid w-full grid-cols-[1fr_auto] items-center gap-4 px-5 py-4 text-left hover:bg-[#f8faf9] md:grid-cols-[1.4fr_.65fr_.6fr_.4fr]">
-        <div className="min-w-0"><div className="flex items-center gap-2"><span className="font-mono text-[10px] font-semibold text-[#78877f]">{report.id}</span>{report.id === 'BUG-2026-014' && <Badge className="h-[18px] bg-[#fff0ed] px-1.5 text-[9px] text-[#b64738]">URGENTE</Badge>}</div><p className="mt-1 truncate text-[13px] font-semibold">{report.title}</p><p className="mt-1 truncate text-[11px] text-[#75847c]">{report.client} · {report.copy}</p></div>
+        <div className="min-w-0"><div className="flex items-center gap-2"><span className="font-mono text-[10px] font-semibold text-[#78877f]">{report.id}</span>{report.id === 'BUG-2026-014' && <Badge className="h-[18px] bg-[#fff0ed] px-1.5 text-[9px] text-[#b64738]">URGENTE</Badge>}{report.canEdit === false && <Badge className="h-[18px] bg-[#f0f2f1] px-1.5 text-[8px] text-[#6c7972]">LEITURA</Badge>}{report.canEdit && !report.isOwner && <Badge className="h-[18px] bg-[#edf7f0] px-1.5 text-[8px] text-[#377853]">COMPARTILHADO</Badge>}</div><p className="mt-1 truncate text-[13px] font-semibold">{report.title}</p><p className="mt-1 truncate text-[11px] text-[#75847c]">{report.client} · {report.copy}</p></div>
         <div className="hidden md:block"><p className="text-[11px] font-medium">{report.version}</p><p className="mt-1 flex items-center gap-1 text-[10px] text-[#849088]"><Paperclip className="size-3" />{report.attachments} anexos</p></div>
         <div className="hidden md:block"><span className={`status status-${report.tone}`}><span />{report.status}</span></div>
         <div className="flex items-center justify-end gap-2 md:justify-start"><span className="grid size-7 place-items-center rounded-full bg-[#e6ece8] text-[9px] font-semibold text-[#385144]">{report.owner}</span><ChevronRight className="size-4 text-[#a1ada6] transition group-hover:translate-x-0.5" /></div>
@@ -577,7 +604,7 @@ function initials(name: string) {
 }
 function statusTone(status: string) { if (status === 'Corrigido') return 'green'; if (status === 'Aguardando reteste') return 'amber'; if (['Em análise', 'Em correção', 'Em teste'].includes(status)) return 'blue'; return 'red'; }
 function formatRoundDate(value: string) { const date = new Date(`${value}T12:00:00`); return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('pt-BR'); }
-function apiReportToItem(row: Record<string, unknown>): ReportItem { const email = String(row.author_email || 'EQ'); return { id: String(row.id), title: String(row.function_name || 'Report'), client: String(row.institution || 'Cliente não informado'), copy: String(row.copy_number || 'Sem cópia'), version: String(row.version || 'Sem versão'), status: String(row.status || 'Novo report'), tone: statusTone(String(row.status || 'Novo report')), owner: initials(email.includes('@') ? email.split('@')[0] : email).slice(0, 2), updated: formatDateTime(Number(row.updated_at || Date.now())), attachments: Number(row.attachment_count || 0) }; }
+function apiReportToItem(row: Record<string, unknown>): ReportItem { const email = String(row.author_email || 'EQ'); return { id: String(row.id), title: String(row.function_name || 'Report'), client: String(row.institution || 'Cliente não informado'), copy: String(row.copy_number || 'Sem cópia'), version: String(row.version || 'Sem versão'), status: String(row.status || 'Novo report'), tone: statusTone(String(row.status || 'Novo report')), owner: initials(email.includes('@') ? email.split('@')[0] : email).slice(0, 2), updated: formatDateTime(Number(row.updated_at || Date.now())), attachments: Number(row.attachment_count || 0), canEdit: Number(row.can_edit) === 1, isOwner: Number(row.is_owner) === 1 }; }
 function formatDateTime(value: number) { return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value)); }
 function actorName(email: string) { const local = email.split('@')[0].replace(/[._-]+/g, ' '); return local.replace(/\b\w/g, (letter) => letter.toUpperCase()); }
 function formatBytes(bytes: number) { if (bytes < 1024) return `${bytes} B`; if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`; return `${(bytes / 1024 / 1024).toFixed(1)} MB`; }
