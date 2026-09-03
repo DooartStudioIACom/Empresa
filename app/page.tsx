@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 
 type ReportItem = { id: string; title: string; client: string; copy: string; version: string; status: string; tone: string; owner: string; reporterName: string; updated: string; attachments: number; urgent?: boolean; canEdit?: boolean; isOwner?: boolean };
+type GlobalBugItem = { id: string; function_name: string; institution: string; copy_number: string | null; version: string | null; system_path: string; status: string; urgent: number; author_email: string; created_at: number; updated_at: number };
 const initialReports: ReportItem[] = [];
 type ReportDetail = {
   report: Record<string, string | number | null>;
@@ -61,6 +62,11 @@ export default function Home() {
   const [formError, setFormError] = useState<string | null>(null);
   const [overviewRound, setOverviewRound] = useState<TestRound | null>(null);
   const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [allBugsOpen, setAllBugsOpen] = useState(false);
+  const [allBugs, setAllBugs] = useState<GlobalBugItem[]>([]);
+  const [allBugsLoading, setAllBugsLoading] = useState(false);
+  const [allBugsQuery, setAllBugsQuery] = useState('');
+  const [allBugsError, setAllBugsError] = useState('');
 
   useEffect(() => {
     fetch('/api/me')
@@ -177,6 +183,22 @@ export default function Home() {
       if (response.ok) setReportDetail(await response.json());
     } finally {
       setDetailLoading(false);
+    }
+  }
+
+  async function openAllBugs() {
+    setAllBugsOpen(true);
+    setAllBugsLoading(true);
+    setAllBugsError('');
+    try {
+      const response = await fetch('/api/reports/all');
+      const payload = await response.json() as { reports?: GlobalBugItem[]; error?: string };
+      if (!response.ok) throw new Error(payload.error || 'Não foi possível carregar os bugs da equipe.');
+      setAllBugs(payload.reports || []);
+    } catch (error) {
+      setAllBugsError(error instanceof Error ? error.message : 'Não foi possível carregar os bugs da equipe.');
+    } finally {
+      setAllBugsLoading(false);
     }
   }
 
@@ -317,6 +339,11 @@ export default function Home() {
             ); })}
           </section>
 
+          <button type="button" onClick={() => void openAllBugs()} className="group mt-4 flex w-full items-center justify-between gap-4 overflow-hidden rounded-2xl border border-[#d6e2da] bg-[linear-gradient(135deg,#ffffff_0%,#f4f9f6_100%)] px-4 py-3 text-left shadow-[0_5px_18px_rgb(16_39_29/5%)] transition hover:-translate-y-0.5 hover:border-[#adc7b6] hover:shadow-[0_10px_26px_rgb(16_39_29/9%)] sm:max-w-[390px]">
+            <span className="flex min-w-0 items-center gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#173e2c] text-[#d7ff66] shadow-sm"><Search className="size-[17px]" /></span><span className="min-w-0"><span className="block text-[9px] font-bold uppercase tracking-[.13em] text-[#71857a]">Consulta geral da equipe</span><span className="mt-0.5 block truncate text-sm font-semibold text-[#21372b]">Ver todos os bugs</span></span></span>
+            <span className="flex shrink-0 items-center gap-2 text-[10px] font-semibold text-[#5f7568]"><ShieldCheck className="size-3.5" /><span className="hidden sm:inline">Somente leitura</span><ChevronRight className="size-4 transition group-hover:translate-x-0.5" /></span>
+          </button>
+
           <div className={`mt-5 grid items-start gap-5 ${showTeamHistory ? 'xl:grid-cols-[minmax(0,1fr)_330px]' : ''}`}>
           <section className="overflow-hidden rounded-[22px] border border-[#d7e2db] bg-white shadow-[0_10px_32px_rgb(16_39_29/6%)]">
             <div className="flex items-center justify-between gap-4 border-b border-[#dfe8e2] bg-[linear-gradient(135deg,#fbfdfc,#f2f7f4)] p-5"><div className="flex min-w-0 items-center gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#173e2c] text-[#d7ff66] shadow-sm"><Activity className="size-[18px]" /></span><div><h2 className="text-base font-semibold text-[#20352a]">Atividade recente</h2><p className="mt-1 text-xs text-[#718078]">Acompanhe as últimas mudanças nos reports da equipe.</p></div></div><button onClick={() => setActiveSection('reports')} className="group/all inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[#d8e3dc] bg-white px-3 py-2 text-xs font-semibold text-[#386349] shadow-sm transition hover:border-[#bcd2c3] hover:bg-[#f7faf8]">Ver todos <ChevronRight className="size-3.5 transition group-hover/all:translate-x-0.5" /></button></div>
@@ -362,6 +389,27 @@ export default function Home() {
           </> : activeSection === 'reports' ? <ReportsView reports={reportItems} onSelect={openReport} role={currentUser.role} /> : activeSection === 'rounds' ? <RoundsView /> : activeSection === 'versions' ? <VersionsView /> : <TeamView currentUserName={currentUser?.displayName || userName} currentUserEmail={currentUser.email} currentUserInitials={userInitials} currentUserRole={currentUser.role} />}
         </div>
       </main>
+
+      <Dialog open={allBugsOpen} onOpenChange={setAllBugsOpen}>
+        <DialogContent className="max-h-[92vh] overflow-hidden border border-white/80 bg-[#f4f7f5] p-0 sm:max-w-4xl">
+          <DialogHeader className="relative border-b border-[#dbe5df] bg-white px-5 py-5 sm:px-7">
+            <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#173e2c,#4f8a63,#d7ff66)]" />
+            <button type="button" onClick={() => setAllBugsOpen(false)} aria-label="Fechar lista de bugs" className="absolute right-4 top-4 grid size-9 place-items-center rounded-xl border border-[#dce5df] bg-white text-[#718078] shadow-sm transition hover:border-[#a9c1b1] hover:text-[#173e2c]"><X className="size-4" /></button>
+            <div className="flex items-start gap-3 pr-11"><span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[#173e2c] text-[#d7ff66] shadow-sm"><Bug className="size-5" /></span><div><div className="flex flex-wrap items-center gap-2"><DialogTitle className="text-xl text-[#1b3024]">Todos os bugs da equipe</DialogTitle><Badge className="border border-[#d4e1d8] bg-[#eef4f0] text-[9px] text-[#526b5c]">SOMENTE CONSULTA</Badge></div><DialogDescription className="mt-1.5 max-w-2xl text-xs leading-5">Consulte antes de criar um novo report e confirme se o mesmo problema já foi registrado por outra pessoa.</DialogDescription></div></div>
+            <div className="relative mt-4"><Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[#84938b]" /><Input value={allBugsQuery} onChange={(event) => setAllBugsQuery(event.target.value)} placeholder="Buscar por bug, cliente, cópia, versão, caminho ou responsável..." className="h-11 border-[#d7e2db] bg-[#f8faf9] pl-10 pr-4 text-xs shadow-none" /></div>
+          </DialogHeader>
+          <div className="max-h-[calc(92vh-190px)] overflow-y-auto p-4 sm:p-6">
+            {allBugsLoading && <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-sm text-[#718078]"><span className="grid size-11 place-items-center rounded-2xl bg-white shadow-sm"><LoaderCircle className="size-5 animate-spin text-[#397657]" /></span>Carregando os bugs da equipe...</div>}
+            {!allBugsLoading && allBugsError && <div role="alert" className="flex min-h-52 flex-col items-center justify-center rounded-2xl border border-[#efc3bb] bg-[#fff5f2] p-6 text-center"><AlertTriangle className="size-6 text-[#b54d3f]" /><p className="mt-3 text-sm font-semibold text-[#8e3c31]">Não foi possível abrir a consulta</p><p className="mt-1 text-xs text-[#9d625a]">{allBugsError}</p><Button type="button" variant="outline" onClick={() => void openAllBugs()} className="mt-4">Tentar novamente</Button></div>}
+            {!allBugsLoading && !allBugsError && (() => {
+              const query = allBugsQuery.trim().toLocaleLowerCase('pt-BR');
+              const visibleBugs = allBugs.filter((bug) => !query || [bug.id, bug.function_name, bug.institution, bug.copy_number, bug.version, bug.system_path, bug.author_email].some((value) => String(value || '').toLocaleLowerCase('pt-BR').includes(query)));
+              if (visibleBugs.length === 0) return <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl border border-dashed border-[#cfddd4] bg-white p-6 text-center"><Search className="size-6 text-[#7e9687]" /><p className="mt-3 text-sm font-semibold text-[#2d4638]">{allBugs.length ? 'Nenhum bug corresponde à busca' : 'Nenhum bug foi reportado ainda'}</p><p className="mt-1 text-xs text-[#7c8b83]">{allBugs.length ? 'Tente pesquisar usando outro termo.' : 'Os reports da equipe aparecerão aqui.'}</p></div>;
+              return <div className="space-y-3"><div className="flex items-center justify-between px-1"><p className="text-[10px] font-semibold uppercase tracking-[.11em] text-[#74857b]">{visibleBugs.length} {visibleBugs.length === 1 ? 'bug encontrado' : 'bugs encontrados'}</p><p className="text-[10px] text-[#8a978f]">Clique em um item para conferir os dados</p></div>{visibleBugs.map((bug) => { const normalizedStatus = normalizeReportStatus(bug.status); const tone = statusTone(bug.status); return <details key={bug.id} className="group overflow-hidden rounded-2xl border border-[#dce5df] bg-white shadow-[0_4px_16px_rgb(16_39_29/4%)] open:border-[#bad0c1] open:shadow-[0_9px_24px_rgb(16_39_29/8%)]"><summary className="flex cursor-pointer list-none items-center gap-3 p-4 marker:hidden"><span className={`status-dot status-${tone} size-2.5 shrink-0 rounded-full`} /><span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><span className="font-mono text-[9px] font-semibold text-[#75847c]">{bug.id}</span>{Number(bug.urgent) === 1 && <Badge className="border border-[#ffd8d1] bg-[#fff0ed] px-1.5 text-[8px] text-[#b64738]">URGENTE</Badge>}<span className={`status status-${tone}`}><span />{normalizedStatus}</span></span><strong className="mt-1.5 block truncate text-sm text-[#21362b]">{bug.function_name}</strong><span className="mt-1 block truncate text-[11px] text-[#75847c]">{bug.institution}{bug.copy_number ? ` · Cópia ${bug.copy_number}` : ''}{bug.version ? ` · ${bug.version}` : ''}</span></span><ChevronRight className="size-4 shrink-0 text-[#8a988f] transition group-open:rotate-90" /></summary><div className="grid gap-3 border-t border-[#e5ece8] bg-[#f8faf9] px-4 py-4 sm:grid-cols-[minmax(0,1.5fr)_minmax(150px,.7fr)_minmax(140px,.6fr)]"><div><p className="text-[8px] font-bold uppercase tracking-[.11em] text-[#89968f]">Caminho no sistema</p><p className="mt-1.5 text-xs leading-5 text-[#43574c]">{bug.system_path || 'Não informado'}</p></div><div><p className="text-[8px] font-bold uppercase tracking-[.11em] text-[#89968f]">Reportado por</p><p className="mt-1.5 text-xs font-semibold text-[#43574c]">{actorName(bug.author_email)}</p></div><div><p className="text-[8px] font-bold uppercase tracking-[.11em] text-[#89968f]">Atualizado</p><p className="mt-1.5 text-xs font-semibold text-[#43574c]">{formatDateTime(bug.updated_at)}</p></div></div></details>; })}</div>;
+            })()}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={newReportOpen} onOpenChange={setNewReportOpen}>
         <DialogContent className="max-h-[92vh] overflow-y-auto p-0 sm:max-w-3xl">
