@@ -282,9 +282,23 @@ export default function Home() {
               </div>
             </article>
 
-            <article className="group rounded-[24px] border border-[#d7e2db] bg-white p-5 shadow-[0_8px_28px_rgb(16_39_29/5%)]">
-              <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[.1em] text-[#58806a]">Rodada em foco</p><h2 className="mt-2 text-base font-semibold text-[#263a2f]">{overviewRound?.title || 'Nenhuma rodada ativa'}</h2></div><span className="grid size-10 place-items-center rounded-xl bg-[#edf5f0] text-[#397657]"><ListChecks className="size-4" /></span></div>
-              <p className="mt-2 text-sm text-[#718078]">{overviewRound ? `${overviewRound.version} · prazo ${formatRoundDate(overviewRound.deadline)}` : 'Crie a primeira rodada para distribuir os testes.'}</p><div className="mt-5 h-2 overflow-hidden rounded-full bg-[#e8eee9]"><div style={{ width: `${overviewProgress}%` }} className="h-full rounded-full bg-[linear-gradient(90deg,#347951,#d7ff66)] transition-all duration-700" /></div><div className="mt-2 flex justify-between text-xs text-[#718078]"><span>{overviewRound ? `${overviewTested} de ${overviewRound.items.length} testados` : 'Sem itens'}</span><strong className="text-[#355844]">{overviewProgress}%</strong></div><button onClick={() => setActiveSection('rounds')} className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[#386349]">Abrir rodada <ChevronRight className="size-4 transition group-hover:translate-x-0.5" /></button>
+            <article className={`round-focus-card ${overviewRound ? overviewProgress >= 100 ? 'round-focus-card--complete' : 'round-focus-card--active' : 'round-focus-card--idle'} group relative overflow-hidden rounded-[24px] border border-[#d7e2db] bg-white p-5 shadow-[0_8px_28px_rgb(16_39_29/5%)]`}>
+              <div className="relative flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-[.1em] text-[#58806a]">Rodada em foco</p>
+                    {overviewRound && <span className="round-focus-state"><span />{overviewProgress >= 100 ? 'Concluída' : 'Em andamento'}</span>}
+                  </div>
+                  <h2 className="mt-2 text-base font-semibold text-[#263a2f]">{overviewRound?.title || 'Nenhuma rodada ativa'}</h2>
+                </div>
+                <span className="round-focus-meter grid size-12 shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(${overviewProgress >= 100 ? '#82bb3a' : '#397b57'} ${overviewProgress}%, #e7efe9 0)` }}>
+                  <span className="grid size-9 place-items-center rounded-full bg-white text-[#397657] shadow-sm"><ListChecks className="size-4" /></span>
+                </span>
+              </div>
+              <p className="relative mt-2 text-sm text-[#718078]">{overviewRound ? `${overviewRound.version} · prazo ${formatRoundDate(overviewRound.deadline)}` : 'Crie a primeira rodada para distribuir os testes.'}</p>
+              <div className="relative mt-5 h-2.5 overflow-hidden rounded-full bg-[#e8eee9] shadow-inner"><div style={{ width: `${overviewProgress}%` }} className="round-focus-progress h-full rounded-full bg-[linear-gradient(90deg,#347951,#8ecb42,#d7ff66)] transition-all duration-700" /></div>
+              <div className="relative mt-2 flex justify-between text-xs text-[#718078]"><span>{overviewRound ? `${overviewTested} de ${overviewRound.items.length} testados` : 'Sem itens'}</span><strong className="text-[#355844]">{overviewProgress}%</strong></div>
+              <button onClick={() => setActiveSection('rounds')} className="relative mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[#386349]">Abrir rodada <span className="grid size-6 place-items-center rounded-full bg-[#edf5f0] transition group-hover:translate-x-0.5 group-hover:bg-[#dcebe1]"><ChevronRight className="size-4" /></span></button>
             </article>
           </section>
 
