@@ -30,6 +30,7 @@ const nav = [
 ] as const;
 
 type SectionId = (typeof nav)[number]['id'];
+const showTeamHistory = false;
 
 export default function Home() {
   const [reportItems, setReportItems] = useState<ReportItem[]>(initialReports);
@@ -313,7 +314,7 @@ export default function Home() {
             ); })}
           </section>
 
-          <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
+          <div className={`mt-5 grid items-start gap-5 ${showTeamHistory ? 'xl:grid-cols-[minmax(0,1fr)_330px]' : ''}`}>
           <section className="overflow-hidden rounded-[22px] border border-[#d7e2db] bg-white shadow-[0_10px_32px_rgb(16_39_29/6%)]">
             <div className="flex items-center justify-between gap-4 border-b border-[#dfe8e2] bg-[linear-gradient(135deg,#fbfdfc,#f2f7f4)] p-5"><div className="flex min-w-0 items-center gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#173e2c] text-[#d7ff66] shadow-sm"><Activity className="size-[18px]" /></span><div><h2 className="text-base font-semibold text-[#20352a]">Atividade recente</h2><p className="mt-1 text-xs text-[#718078]">Acompanhe as últimas mudanças nos reports da equipe.</p></div></div><button onClick={() => setActiveSection('reports')} className="group/all inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[#d8e3dc] bg-white px-3 py-2 text-xs font-semibold text-[#386349] shadow-sm transition hover:border-[#bcd2c3] hover:bg-[#f7faf8]">Ver todos <ChevronRight className="size-3.5 transition group-hover/all:translate-x-0.5" /></button></div>
             <div className="divide-y divide-[#e5ece8]">
@@ -331,7 +332,7 @@ export default function Home() {
             </div>
           </section>
 
-          <aside>
+          {showTeamHistory && <aside>
             <section className="team-history-card relative overflow-hidden rounded-[24px] border border-[#d8e4dc] bg-white shadow-[0_10px_30px_rgb(16_56_35/6%)]">
               <div className="team-history-grid" aria-hidden="true" />
               <div className="relative flex items-start justify-between gap-3 px-5 pb-4 pt-5">
@@ -353,7 +354,7 @@ export default function Home() {
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e6ede8]"><div className="team-history-progress h-full rounded-full bg-[linear-gradient(90deg,#397657,#86b83e,#c8ef62)]" style={{ width: `${overviewTopVersionShare}%` }} /></div>
               </div>
             </section>
-          </aside>
+          </aside>}
           </div>
           </> : activeSection === 'reports' ? <ReportsView reports={reportItems} onSelect={openReport} /> : activeSection === 'rounds' ? <RoundsView /> : activeSection === 'versions' ? <VersionsView /> : <TeamView currentUserName={currentUser?.displayName || userName} currentUserInitials={userInitials} />}
         </div>
