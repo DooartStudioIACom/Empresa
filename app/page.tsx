@@ -311,6 +311,7 @@ export default function Home() {
             </article>
 
             <article className={`round-focus-card ${overviewRound ? overviewProgress >= 100 ? 'round-focus-card--complete' : 'round-focus-card--active' : 'round-focus-card--idle'} group relative overflow-hidden rounded-[24px] border border-[#d7e2db] bg-white p-5 shadow-[0_8px_28px_rgb(16_39_29/5%)]`}>
+              {overviewRound ? <>
               <div className="relative flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -326,6 +327,11 @@ export default function Home() {
                 <div><div className="h-2.5 overflow-hidden rounded-full bg-[#e8eee9] shadow-inner"><div style={{ width: `${overviewProgress}%` }} className="round-focus-progress h-full rounded-full bg-[linear-gradient(90deg,#347951,#8ecb42,#d7ff66)] transition-all duration-700" /></div><div className="mt-2 flex items-center justify-between text-xs text-[#718078]"><span>{overviewRound ? `${overviewTested} de ${overviewRound.items.length} testados` : 'Sem itens'}</span><span className="font-medium text-[#527060]">Progresso</span></div></div>
                 <span className="round-focus-meter grid size-12 shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(${overviewProgress >= 100 ? '#82bb3a' : '#397b57'} ${overviewProgress}%, #e7efe9 0)` }}><strong className="grid size-9 place-items-center rounded-full bg-white text-[11px] text-[#397657] shadow-sm">{overviewProgress}%</strong></span>
               </div>
+              </> : <>
+                <div className="relative flex items-center justify-between gap-3"><p className="text-xs font-semibold uppercase tracking-[.1em] text-[#58806a]">Rodadas de testes</p><span className="rounded-full border border-[#d9e5dc] bg-white/80 px-2.5 py-1 text-[10px] font-semibold text-[#6b8073] shadow-sm">Comece por aqui</span></div>
+                <div className="relative mt-4 flex items-center gap-4"><span className="grid size-14 shrink-0 place-items-center rounded-2xl border border-[#cfe0d5] bg-[linear-gradient(145deg,#173e2c,#2e6b4a)] text-[#d7ff66] shadow-[0_10px_24px_rgb(23_62_44/18%)]"><ListChecks className="size-6" /></span><div className="min-w-0"><h2 className="text-base font-semibold leading-5 text-[#263a2f]">Organize a próxima entrega</h2><p className="mt-1.5 text-xs leading-5 text-[#718078]">Reúna os testes, distribua para a equipe e acompanhe cada resultado.</p></div></div>
+                <button type="button" onClick={() => setActiveSection('rounds')} className="group/create relative mt-4 flex w-full items-center justify-between rounded-xl bg-[#173e2c] px-4 py-3 text-left text-xs font-semibold text-white shadow-[0_8px_20px_rgb(23_62_44/18%)] transition hover:-translate-y-0.5 hover:bg-[#24573f]"><span className="flex items-center gap-2"><Plus className="size-4 text-[#d7ff66]" />Criar primeira rodada</span><ChevronRight className="size-4 transition group-hover/create:translate-x-0.5" /></button>
+              </>}
             </article>
           </section>
 
