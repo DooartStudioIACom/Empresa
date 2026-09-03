@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { ensureDatabase } from '@/lib/db-init';
+import { getTeamRole } from '@/lib/report-access';
 
 export const dynamic = 'force-dynamic';
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -19,14 +20,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   const report = await env.DB.prepare('SELECT * FROM reports WHERE id = ?').bind(id).first();
   if (!report) return Response.json({ error: 'Report não encontrado' }, { status: 404 });
-  const isOwner = report.author_id === user.userId;
+  const role = await getTeamRole(user.email);
+  const isOwner = report.author_id === user.userId || String(report.author_email || '').toLowerCase() === user.email.toLowerCase();
   const shared = isOwner ? true : Boolean(await env.DB.prepare('SELECT 1 FROM report_shares WHERE report_id=? AND lower(user_email)=lower(?)').bind(id, user.email).first());
+  const roleAccess = role === 'manager' || (role === 'developer' && normalizeStatus(String(report.status || '')) === 'Com Desenvolvimento');
+  if (!isOwner && !shared && !roleAccess) return Response.json({ error: 'Este report não está disponível para o seu perfil.' }, { status: 403 });
   const [attachments, activities] = await Promise.all([
     env.DB.prepare('SELECT id, file_name, content_type, byte_size, kind, created_at FROM attachments WHERE report_id = ? ORDER BY created_at ASC').bind(id).all(),
     env.DB.prepare('SELECT id, actor_email, action, message, created_at FROM activities WHERE report_id = ? ORDER BY created_at ASC').bind(id).all(),
   ]);
   const shares = isOwner ? await env.DB.prepare('SELECT user_email,permission,created_at FROM report_shares WHERE report_id=? ORDER BY created_at').bind(id).all() : { results: [] };
-  return Response.json({ report, attachments: attachments.results, activities: activities.results, permissions: { isOwner, canEdit: isOwner || shared }, shares: shares.results });
+  return Response.json({ report, attachments: attachments.results, activities: activities.results, permissions: { isOwner, canEdit: isOwner || shared || roleAccess, role }, shares: shares.results });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -34,9 +38,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!user) return Response.json({ error: 'Não autenticado' }, { status: 401 });
   await ensureDatabase();
   const { id } = await params;
-  const existing = await env.DB.prepare('SELECT id, status, author_id FROM reports WHERE id = ?').bind(id).first<{ id: string; status: string; author_id: string }>();
+  const existing = await env.DB.prepare('SELECT id, status, author_id, author_email FROM reports WHERE id = ?').bind(id).first<{ id: string; status: string; author_id: string; author_email: string }>();
   if (!existing) return Response.json({ error: 'Report não encontrado' }, { status: 404 });
-  const canEdit = existing.author_id === user.userId || Boolean(await env.DB.prepare('SELECT 1 FROM report_shares WHERE report_id=? AND lower(user_email)=lower(?)').bind(id, user.email).first());
+  const role = await getTeamRole(user.email);
+  const isOwner = existing.author_id === user.userId || existing.author_email.toLowerCase() === user.email.toLowerCase();
+  const roleAccess = role === 'manager' || (role === 'developer' && normalizeStatus(existing.status) === 'Com Desenvolvimento');
+  const canEdit = isOwner || roleAccess || Boolean(await env.DB.prepare('SELECT 1 FROM report_shares WHERE report_id=? AND lower(user_email)=lower(?)').bind(id, user.email).first());
   if (!canEdit) return Response.json({ error: 'Este report está disponível somente para leitura. O autor precisa compartilhar a edição com você.' }, { status: 403 });
   const data = await request.formData();
   const message = field(data, 'message');
@@ -46,6 +53,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (status !== currentStatus && !ALLOWED_TRANSITIONS[currentStatus]?.has(status)) {
     return Response.json({ error: `Esta mudança não é permitida: ${currentStatus} → ${status}` }, { status: 400 });
   }
+  if (status !== currentStatus && !canTransition(role, isOwner, currentStatus, status)) return Response.json({ error: 'Esta etapa deve ser concluída pelo perfil responsável no fluxo.' }, { status: 403 });
   const attachmentValue = data.get('attachment');
   const attachment = attachmentValue instanceof File && attachmentValue.size > 0 ? attachmentValue : null;
   if (!message && status === currentStatus && !attachment) return Response.json({ error: 'Escreva uma resposta ou avance o fluxo' }, { status: 400 });
@@ -90,4 +98,10 @@ function transitionMessage(from: string, to: string) {
   if (from === 'Aguardando reteste' && to === 'Com Desenvolvimento') return 'O problema continua no reteste. Report devolvido ao Desenvolvimento.';
   if (from === 'Finalizado' && to === 'Com Desenvolvimento') return 'Report reaberto e encaminhado ao Desenvolvimento.';
   return `Status alterado de ${from} para ${to}.`;
+}
+function canTransition(role: 'support' | 'manager' | 'developer', isOwner: boolean, from: string, to: string) {
+  if (role === 'manager') return true;
+  if (role === 'developer') return from === 'Com Desenvolvimento' && to === 'Aguardando reteste';
+  if (!isOwner) return false;
+  return (from === 'Novo report' && to === 'Com Desenvolvimento') || (from === 'Aguardando reteste' && ['Finalizado', 'Com Desenvolvimento'].includes(to)) || (from === 'Finalizado' && to === 'Com Desenvolvimento');
 }

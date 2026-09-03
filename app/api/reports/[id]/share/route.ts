@@ -9,9 +9,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!user) return Response.json({ error: 'Não autenticado' }, { status: 401 });
   await ensureDatabase();
   const { id } = await params;
-  const report = await env.DB.prepare('SELECT id,author_id FROM reports WHERE id=?').bind(id).first<{ id: string; author_id: string }>();
+  const report = await env.DB.prepare('SELECT id,author_id,author_email FROM reports WHERE id=?').bind(id).first<{ id: string; author_id: string; author_email: string }>();
   if (!report) return Response.json({ error: 'Report não encontrado' }, { status: 404 });
-  if (report.author_id !== user.userId) return Response.json({ error: 'Somente o autor pode compartilhar este report' }, { status: 403 });
+  if (report.author_id !== user.userId && report.author_email.toLowerCase() !== user.email.toLowerCase()) return Response.json({ error: 'Somente o autor pode compartilhar este report' }, { status: 403 });
   const body = await request.json().catch(() => null) as { email?: string; action?: string } | null;
   const email = String(body?.email || '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return Response.json({ error: 'Informe um e-mail válido' }, { status: 400 });
