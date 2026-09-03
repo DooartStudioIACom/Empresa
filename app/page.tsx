@@ -271,7 +271,10 @@ export default function Home() {
         <div className="mx-auto max-w-[1420px] px-5 py-7 sm:px-8">
           {activeSection === 'overview' ? <>
           <section className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,.55fr)]">
-            <article className="relative overflow-hidden rounded-[24px] bg-[#0d281c] p-5 text-white shadow-[0_18px_44px_rgb(13_40_28/16%)] sm:p-6">
+            <article className="alert-tech-card relative overflow-hidden rounded-[24px] bg-[#0d281c] p-5 text-white shadow-[0_18px_44px_rgb(13_40_28/16%)] sm:p-6">
+              <div className="alert-tech-grid" aria-hidden="true" />
+              <div className="alert-tech-scan" aria-hidden="true" />
+              <div className="alert-tech-circuit" aria-hidden="true"><span /><span /><span /></div>
               <div className="pointer-events-none absolute -right-12 -top-16 size-52 rounded-full bg-[#d7ff66]/[.07] blur-2xl" />
               <div className="relative flex h-full items-start gap-4 sm:items-center sm:gap-5">
                 <span className={`grid size-12 shrink-0 place-items-center rounded-2xl border ${overviewAttention > 0 ? 'border-[#d7ff66]/25 bg-[#d7ff66]/10 text-[#d7ff66]' : 'border-white/15 bg-white/8 text-white/75'}`}>{overviewAttention > 0 ? <Bell className="size-5" /> : <CircleCheck className="size-5" />}</span>
