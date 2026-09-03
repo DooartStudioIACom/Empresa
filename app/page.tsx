@@ -102,6 +102,7 @@ export default function Home() {
     return counts;
   }, {});
   const overviewTopVersion = Object.entries(reportVersionCounts).sort((first, second) => second[1] - first[1])[0] || null;
+  const overviewTopVersionShare = overviewTopVersion && reportItems.length ? Math.round((overviewTopVersion[1] / reportItems.length) * 100) : 0;
   const overviewTested = overviewRound?.items.filter((item) => ['Aprovado', 'Com bug'].includes(item.status)).length || 0;
   const overviewProgress = overviewRound?.items.length ? Math.round((overviewTested / overviewRound.items.length) * 100) : 0;
   const linkedRound = reportRounds.find((round) => round.id === linkedRoundId) || null;
@@ -330,9 +331,26 @@ export default function Home() {
           </section>
 
           <aside>
-            <section className="overflow-hidden rounded-2xl border border-[#dce5df] bg-white shadow-[0_4px_18px_rgb(16_39_29/4%)]">
-              <div className="flex items-start justify-between gap-3 border-b border-[#e6ece8] bg-[linear-gradient(135deg,#f7faf8,#eef5f0)] p-5"><div><p className="text-xs font-semibold uppercase tracking-[.1em] text-[#58806a]">Histórico geral</p><h2 className="mt-1 text-base font-semibold">Bugs da equipe</h2><p className="mt-1 text-xs text-[#76857d]">Considera todos os reports registrados.</p></div><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-[#397657] shadow-sm"><Activity className="size-5" /></span></div>
-              <div className="grid grid-cols-2 gap-px bg-[#e5ece7]"><div className="bg-white p-4"><p className="text-[28px] font-semibold leading-none tracking-[-.05em] text-[#173e2c]">{reportItems.length}</p><p className="mt-2 text-xs font-medium text-[#53665b]">bugs reportados</p><p className="mt-1 text-[11px] text-[#87948d]">por toda a equipe</p></div><div className="min-w-0 bg-white p-4"><p className="truncate text-xl font-semibold leading-7 tracking-[-.03em] text-[#173e2c]" title={overviewTopVersion?.[0]}>{overviewTopVersion?.[0] || '—'}</p><p className="mt-1 text-xs font-medium text-[#53665b]">versão com mais bugs</p><p className="mt-1 text-[11px] text-[#87948d]">{overviewTopVersion ? `${overviewTopVersion[1]} ${overviewTopVersion[1] === 1 ? 'report' : 'reports'}` : 'sem dados de versão'}</p></div></div>
+            <section className="team-history-card relative overflow-hidden rounded-[24px] border border-[#d8e4dc] bg-white shadow-[0_10px_30px_rgb(16_56_35/6%)]">
+              <div className="team-history-grid" aria-hidden="true" />
+              <div className="relative flex items-start justify-between gap-3 px-5 pb-4 pt-5">
+                <div><p className="text-xs font-semibold uppercase tracking-[.12em] text-[#58806a]">Histórico geral</p><h2 className="mt-1 text-lg font-semibold tracking-[-.02em] text-[#203a2d]">Bugs da equipe</h2><p className="mt-1 text-xs leading-5 text-[#76857d]">Visão acumulada de todos os reports.</p></div>
+                <span className="team-history-icon grid size-11 shrink-0 place-items-center rounded-full border border-[#d9e7de] bg-white text-[#397657]"><Activity className="size-5" /></span>
+              </div>
+              <div className="relative grid grid-cols-2 gap-3 px-4 pb-4">
+                <div className="rounded-2xl border border-[#e1e9e4] bg-[#f8fbf9] p-4">
+                  <div className="flex items-center justify-between gap-2"><span className="grid size-8 place-items-center rounded-lg bg-[#e9f4ed] text-[#397657]"><Bug className="size-4" /></span><span className="text-xs font-medium text-[#718078]">Total</span></div>
+                  <p className="mt-4 text-[32px] font-semibold leading-none tracking-[-.06em] text-[#173e2c]">{reportItems.length}</p><p className="mt-2 text-sm font-semibold text-[#344b3f]">bugs reportados</p><p className="mt-1 text-xs text-[#7f8e86]">por toda a equipe</p>
+                </div>
+                <div className="min-w-0 rounded-2xl border border-[#dce9cd] bg-[linear-gradient(145deg,#fbfff6,#f2f9e8)] p-4">
+                  <div className="flex items-center justify-between gap-2"><span className="grid size-8 place-items-center rounded-lg bg-[#e5f2d4] text-[#5f8b27]"><PackageCheck className="size-4" /></span>{overviewTopVersion && <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-[#62852d] shadow-sm">{overviewTopVersionShare}%</span>}</div>
+                  <p className="mt-4 truncate text-2xl font-semibold leading-none tracking-[-.04em] text-[#173e2c]" title={overviewTopVersion?.[0]}>{overviewTopVersion?.[0] || '—'}</p><p className="mt-2 text-sm font-semibold text-[#344b3f]">versão mais afetada</p><p className="mt-1 text-xs text-[#7f8e86]">{overviewTopVersion ? `${overviewTopVersion[1]} ${overviewTopVersion[1] === 1 ? 'report registrado' : 'reports registrados'}` : 'sem dados de versão'}</p>
+                </div>
+              </div>
+              <div className="relative border-t border-[#e7ede9] bg-[#fbfdfb] px-5 py-4">
+                <div className="flex items-center justify-between gap-3 text-xs"><span className="font-medium text-[#53665b]">Concentração na versão líder</span><strong className="text-[#397657]">{overviewTopVersionShare}%</strong></div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e6ede8]"><div className="team-history-progress h-full rounded-full bg-[linear-gradient(90deg,#397657,#86b83e,#c8ef62)]" style={{ width: `${overviewTopVersionShare}%` }} /></div>
+              </div>
             </section>
           </aside>
           </div>

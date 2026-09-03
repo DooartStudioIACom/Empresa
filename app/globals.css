@@ -147,7 +147,14 @@ body {
 .round-focus-progress::after { content:""; position:absolute; inset:0; width:42%; transform:translateX(-140%) skewX(-22deg); background:linear-gradient(90deg,transparent,rgb(255 255 255 / 72%),transparent); animation:roundFocusShine 3.6s ease-in-out infinite; }
 @keyframes roundFocusPulse { 0%,100% { opacity:.55; transform:scale(.85); } 50% { opacity:1; transform:scale(1.18); } }
 @keyframes roundFocusShine { 0%,18% { transform:translateX(-140%) skewX(-22deg); } 68%,100% { transform:translateX(340%) skewX(-22deg); } }
-@media (prefers-reduced-motion: reduce) { .beacon-light-ring,.beacon-on,.alert-tech-card--active,.alert-tech-live-wave,.alert-tech-scan,.alert-tech-circuit span,.round-focus-state span,.round-focus-progress::after { animation:none; } }
+.team-history-card { isolation:isolate; transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease; }
+.team-history-card:hover { transform:translateY(-2px); border-color:#bcd2c3; box-shadow:0 16px 38px rgb(16 75 43 / 10%); }
+.team-history-card::before { content:""; position:absolute; inset:0 0 auto; height:4px; background:linear-gradient(90deg,#2f7650,#7eaf3d,#d0f460); }
+.team-history-grid { position:absolute; inset:0 0 auto 42%; height:48%; pointer-events:none; opacity:.45; background-image:linear-gradient(rgb(57 123 87 / 8%) 1px,transparent 1px),linear-gradient(90deg,rgb(57 123 87 / 8%) 1px,transparent 1px); background-size:20px 20px; mask-image:linear-gradient(90deg,transparent,black); }
+.team-history-icon { box-shadow:0 7px 18px rgb(44 103 69 / 12%); transition:transform .3s ease,box-shadow .3s ease; }
+.team-history-card:hover .team-history-icon { transform:rotate(-8deg) scale(1.05); box-shadow:0 10px 24px rgb(44 103 69 / 17%); }
+.team-history-progress { min-width:4px; transition:width .7s ease; }
+@media (prefers-reduced-motion: reduce) { .beacon-light-ring,.beacon-on,.alert-tech-card--active,.alert-tech-live-wave,.alert-tech-scan,.alert-tech-circuit span,.round-focus-state span,.round-focus-progress::after { animation:none; } .team-history-card,.team-history-icon,.team-history-progress { transition:none; } }
 
 .dark {
   --background: oklch(0.145 0 0);
