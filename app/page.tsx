@@ -96,7 +96,12 @@ export default function Home() {
     { step: '04', label: 'Finalizado', value: String(reportItems.filter((item) => item.status === 'Finalizado').length), note: 'OK confirmado no reteste', icon: CircleCheck, tone: 'green' },
   ];
   const overviewAttention = reportItems.filter((item) => item.status === 'Novo report' || item.status === 'Aguardando reteste').length;
-  const overviewInProgress = reportItems.filter((item) => item.status === 'Com Desenvolvimento').length;
+  const reportVersionCounts = reportItems.reduce<Record<string, number>>((counts, report) => {
+    const version = report.version.trim();
+    if (version && version !== 'Sem versão') counts[version] = (counts[version] || 0) + 1;
+    return counts;
+  }, {});
+  const overviewTopVersion = Object.entries(reportVersionCounts).sort((first, second) => second[1] - first[1])[0] || null;
   const overviewTested = overviewRound?.items.filter((item) => ['Aprovado', 'Com bug'].includes(item.status)).length || 0;
   const overviewProgress = overviewRound?.items.length ? Math.round((overviewTested / overviewRound.items.length) * 100) : 0;
   const linkedRound = reportRounds.find((round) => round.id === linkedRoundId) || null;
@@ -307,7 +312,10 @@ export default function Home() {
           </section>
 
           <aside>
-            <section className="rounded-2xl border border-[#dce5df] bg-white p-5 shadow-[0_4px_18px_rgb(16_39_29/4%)]"><div className="flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-[.1em] text-[#58806a]">Fluxo agora</p><h2 className="mt-1 text-base font-semibold">Visão rápida</h2></div><Activity className="size-5 text-[#4a7b5d]" /></div><div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-xl bg-[#f5f8f6] p-3"><p className="text-2xl font-semibold tracking-[-.04em]">{overviewInProgress}</p><p className="mt-1 text-xs text-[#738179]">em andamento</p></div><div className="rounded-xl bg-[#f5f8f6] p-3"><p className="text-2xl font-semibold tracking-[-.04em]">{overviewAttention}</p><p className="mt-1 text-xs text-[#738179]">pedem atenção</p></div></div></section>
+            <section className="overflow-hidden rounded-2xl border border-[#dce5df] bg-white shadow-[0_4px_18px_rgb(16_39_29/4%)]">
+              <div className="flex items-start justify-between gap-3 border-b border-[#e6ece8] bg-[linear-gradient(135deg,#f7faf8,#eef5f0)] p-5"><div><p className="text-xs font-semibold uppercase tracking-[.1em] text-[#58806a]">Histórico geral</p><h2 className="mt-1 text-base font-semibold">Bugs da equipe</h2><p className="mt-1 text-xs text-[#76857d]">Considera todos os reports registrados.</p></div><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-[#397657] shadow-sm"><Activity className="size-5" /></span></div>
+              <div className="grid grid-cols-2 gap-px bg-[#e5ece7]"><div className="bg-white p-4"><p className="text-[28px] font-semibold leading-none tracking-[-.05em] text-[#173e2c]">{reportItems.length}</p><p className="mt-2 text-xs font-medium text-[#53665b]">bugs reportados</p><p className="mt-1 text-[11px] text-[#87948d]">por toda a equipe</p></div><div className="min-w-0 bg-white p-4"><p className="truncate text-xl font-semibold leading-7 tracking-[-.03em] text-[#173e2c]" title={overviewTopVersion?.[0]}>{overviewTopVersion?.[0] || '—'}</p><p className="mt-1 text-xs font-medium text-[#53665b]">versão com mais bugs</p><p className="mt-1 text-[11px] text-[#87948d]">{overviewTopVersion ? `${overviewTopVersion[1]} ${overviewTopVersion[1] === 1 ? 'report' : 'reports'}` : 'sem dados de versão'}</p></div></div>
+            </section>
           </aside>
           </div>
           </> : activeSection === 'reports' ? <ReportsView reports={reportItems} onSelect={openReport} /> : activeSection === 'rounds' ? <RoundsView /> : activeSection === 'versions' ? <VersionsView /> : <TeamView currentUserName={currentUser?.displayName || userName} currentUserInitials={userInitials} />}
