@@ -21,12 +21,6 @@ type TestRoundItem = { id: string; round_id: string; position: number; title: st
 type RoundParticipant = { round_id: string; user_id: string; user_email: string; user_name: string; total_items: number; done_items: number; bug_items: number; progress: number; completed_at: number | null; is_current: boolean };
 type TestRound = { id: string; title: string; version: string; deadline: string; description: string | null; status: string; author_email: string; created_at: number; updated_at: number; items: TestRoundItem[]; participants?: RoundParticipant[] };
 
-const qualityTips = [
-  'Antes de reportar, registre o caminho exato e tente repetir o erro uma segunda vez.',
-  'Ao retestar, confira também o fluxo vizinho: uma correção pode afetar telas relacionadas.',
-  'Prints com contexto e uma cópia atualizada reduzem o tempo de análise do Desenvolvimento.',
-];
-
 const nav = [
   { id: 'overview', label: 'Visão geral', icon: LayoutDashboard },
   { id: 'reports', label: 'Reports', icon: Bug },
@@ -63,7 +57,6 @@ export default function Home() {
   const [formError, setFormError] = useState<string | null>(null);
   const [overviewRound, setOverviewRound] = useState<TestRound | null>(null);
   const [lastSync, setLastSync] = useState<Date | null>(null);
-  const [tipIndex, setTipIndex] = useState(0);
 
   useEffect(() => {
     fetch('/api/me')
@@ -80,8 +73,7 @@ export default function Home() {
     };
     void syncDashboard();
     const syncTimer = window.setInterval(syncDashboard, 15000);
-    const tipTimer = window.setInterval(() => setTipIndex((current) => (current + 1) % qualityTips.length), 7000);
-    return () => { window.clearInterval(syncTimer); window.clearInterval(tipTimer); };
+    return () => window.clearInterval(syncTimer);
   }, []);
 
   useEffect(() => {
@@ -314,9 +306,8 @@ export default function Home() {
             </div>
           </section>
 
-          <aside className="space-y-4">
+          <aside>
             <section className="rounded-2xl border border-[#dce5df] bg-white p-5 shadow-[0_4px_18px_rgb(16_39_29/4%)]"><div className="flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-[.1em] text-[#58806a]">Fluxo agora</p><h2 className="mt-1 text-base font-semibold">Visão rápida</h2></div><Activity className="size-5 text-[#4a7b5d]" /></div><div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-xl bg-[#f5f8f6] p-3"><p className="text-2xl font-semibold tracking-[-.04em]">{overviewInProgress}</p><p className="mt-1 text-xs text-[#738179]">em andamento</p></div><div className="rounded-xl bg-[#f5f8f6] p-3"><p className="text-2xl font-semibold tracking-[-.04em]">{overviewAttention}</p><p className="mt-1 text-xs text-[#738179]">pedem atenção</p></div></div></section>
-            <section className="rounded-2xl border border-[#dce5df] bg-[linear-gradient(145deg,#fffdf5,#f0f8f3)] p-5 shadow-[0_4px_18px_rgb(16_39_29/4%)]"><div className="flex items-center gap-2"><span className="grid size-9 place-items-center rounded-xl bg-white text-[#6d8f48] shadow-sm"><Sparkles className="size-4" /></span><div><p className="text-xs font-semibold uppercase tracking-[.1em] text-[#7b6b35]">Dica da vez</p><h2 className="mt-0.5 text-base font-semibold">Teste com contexto</h2></div></div><p className="mt-4 text-sm leading-6 text-[#66766d]">{qualityTips[tipIndex]}</p><div className="mt-4 flex gap-1">{qualityTips.map((_, index) => <span key={index} className={`h-1.5 rounded-full transition-all ${index === tipIndex ? 'w-5 bg-[#6d8f48]' : 'w-1.5 bg-[#d7dfd8]'}`} />)}</div></section>
           </aside>
           </div>
           </> : activeSection === 'reports' ? <ReportsView reports={reportItems} onSelect={openReport} /> : activeSection === 'rounds' ? <RoundsView /> : activeSection === 'versions' ? <VersionsView /> : <TeamView currentUserName={currentUser?.displayName || userName} currentUserInitials={userInitials} />}
