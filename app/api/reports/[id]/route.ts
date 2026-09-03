@@ -4,7 +4,13 @@ import { ensureDatabase } from '@/lib/db-init';
 
 export const dynamic = 'force-dynamic';
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
-const ALLOWED_STATUSES = new Set(['Novo report', 'Em análise', 'Em correção', 'Aguardando reteste', 'Corrigido', 'Ainda ocorre']);
+const ALLOWED_STATUSES = new Set(['Novo report', 'Com Desenvolvimento', 'Aguardando reteste', 'Finalizado']);
+const ALLOWED_TRANSITIONS: Record<string, Set<string>> = {
+  'Novo report': new Set(['Com Desenvolvimento']),
+  'Com Desenvolvimento': new Set(['Aguardando reteste']),
+  'Aguardando reteste': new Set(['Finalizado', 'Com Desenvolvimento']),
+  Finalizado: new Set(['Com Desenvolvimento']),
+};
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getChatGPTUser();
@@ -34,17 +40,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!canEdit) return Response.json({ error: 'Este report está disponível somente para leitura. O autor precisa compartilhar a edição com você.' }, { status: 403 });
   const data = await request.formData();
   const message = field(data, 'message');
+  const currentStatus = normalizeStatus(existing.status);
   const requestedStatus = field(data, 'status');
-  const status = ALLOWED_STATUSES.has(requestedStatus) ? requestedStatus : existing.status;
+  const status = ALLOWED_STATUSES.has(requestedStatus) ? requestedStatus : currentStatus;
+  if (status !== currentStatus && !ALLOWED_TRANSITIONS[currentStatus]?.has(status)) {
+    return Response.json({ error: `Esta mudança não é permitida: ${currentStatus} → ${status}` }, { status: 400 });
+  }
   const attachmentValue = data.get('attachment');
   const attachment = attachmentValue instanceof File && attachmentValue.size > 0 ? attachmentValue : null;
-  if (!message && status === existing.status && !attachment) return Response.json({ error: 'Escreva uma resposta ou altere o status' }, { status: 400 });
+  if (!message && status === currentStatus && !attachment) return Response.json({ error: 'Escreva uma resposta ou avance o fluxo' }, { status: 400 });
   if (attachment && attachment.size > MAX_FILE_BYTES) return Response.json({ error: 'O anexo excede 10 MB' }, { status: 413 });
   const now = Date.now();
   let objectKey: string | null = null;
   try {
+    const changedStatus = status !== currentStatus;
     const statements = [env.DB.prepare('UPDATE reports SET status = ?, updated_at = ? WHERE id = ?').bind(status, now, id)];
-    if (message || status !== existing.status) statements.push(env.DB.prepare('INSERT INTO activities (id,report_id,actor_id,actor_email,action,message,created_at) VALUES (?,?,?,?,?,?,?)').bind(crypto.randomUUID(), id, user.userId, user.email, status !== existing.status ? 'status_update' : 'comment', message || `Status alterado para ${status}.`, now));
+    if (message || changedStatus) {
+      const activityMessage = changedStatus ? [transitionMessage(currentStatus, status), message].filter(Boolean).join(' ') : message;
+      statements.push(env.DB.prepare('INSERT INTO activities (id,report_id,actor_id,actor_email,action,message,created_at) VALUES (?,?,?,?,?,?,?)').bind(crypto.randomUUID(), id, user.userId, user.email, changedStatus ? 'status_update' : 'comment', activityMessage, now));
+    }
     if (attachment) {
       const attachmentId = crypto.randomUUID();
       objectKey = `reports/${id}/${attachmentId}-${safeName(attachment.name)}`;
@@ -63,3 +77,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
 function field(data: FormData, name: string) { const value = data.get(name); return typeof value === 'string' ? value.trim() : ''; }
 function safeName(name: string) { return name.normalize('NFKD').replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-').slice(0, 120); }
+function normalizeStatus(status: string) {
+  if (['Corrigido', 'Finalizado'].includes(status)) return 'Finalizado';
+  if (status === 'Aguardando reteste') return status;
+  if (['Em análise', 'Em correção', 'Em teste', 'Ainda ocorre', 'Com Desenvolvimento'].includes(status)) return 'Com Desenvolvimento';
+  return 'Novo report';
+}
+function transitionMessage(from: string, to: string) {
+  if (from === 'Novo report' && to === 'Com Desenvolvimento') return 'Report encaminhado ao Desenvolvimento.';
+  if (from === 'Com Desenvolvimento' && to === 'Aguardando reteste') return 'Correção liberada pelo Desenvolvimento para reteste.';
+  if (from === 'Aguardando reteste' && to === 'Finalizado') return 'Reteste aprovado. Report finalizado com OK.';
+  if (from === 'Aguardando reteste' && to === 'Com Desenvolvimento') return 'O problema continua no reteste. Report devolvido ao Desenvolvimento.';
+  if (from === 'Finalizado' && to === 'Com Desenvolvimento') return 'Report reaberto e encaminhado ao Desenvolvimento.';
+  return `Status alterado de ${from} para ${to}.`;
+}
