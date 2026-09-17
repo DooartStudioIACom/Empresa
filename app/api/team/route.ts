@@ -12,7 +12,9 @@ export async function GET() {
   await ensureDatabase();
   const role = await getTeamRole(user.email);
   const members = await env.DB.prepare('SELECT email,name,role,updated_at FROM team_members ORDER BY CASE role WHEN \'manager\' THEN 1 WHEN \'developer\' THEN 2 ELSE 3 END,name').all();
-  return Response.json({ members: members.results, currentRole: role });
+  const rows = members.results as Array<{ email: string; name: string; role: string; updated_at: number }>;
+  if (!rows.some((member) => member.email.toLowerCase() === user.email.toLowerCase())) rows.push({ email: user.email, name: user.fullName || user.displayName || user.email.split('@')[0], role, updated_at: Date.now() });
+  return Response.json({ members: rows, currentRole: role });
 }
 
 export async function POST(request: Request) {

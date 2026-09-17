@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { ensureDatabase } from '@/lib/db-init';
 import { getTeamRole } from '@/lib/report-access';
+import { assignmentColumns, responsibleEmail } from '@/lib/report-assignment';
 
 export const dynamic = 'force-dynamic';
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -11,7 +12,7 @@ export async function GET() {
   const user = await getChatGPTUser(); if (!user) return Response.json({ error: 'Não autenticado' }, { status: 401 });
   await ensureDatabase();
   const role = await getTeamRole(user.email);
-  const base = `SELECT r.id, r.function_name, r.institution, r.copy_number, r.version, r.status, r.urgent, r.author_email, r.updated_at, COUNT(a.id) AS attachment_count, CASE WHEN r.author_id=? OR lower(r.author_email)=lower(?) THEN 1 ELSE 0 END AS is_owner`;
+  const base = `SELECT ${assignmentColumns}, r.id, r.function_name, r.institution, r.copy_number, r.version, r.status, r.urgent, r.author_email, r.updated_at, COUNT(a.id) AS attachment_count, CASE WHEN r.author_id=? OR lower(r.author_email)=lower(?) THEN 1 ELSE 0 END AS is_owner`;
   let statement;
   if (role === 'manager') {
     statement = env.DB.prepare(`${base}, 1 AS can_edit FROM reports r LEFT JOIN attachments a ON a.report_id=r.id GROUP BY r.id ORDER BY r.updated_at DESC LIMIT 100`).bind(user.userId, user.email);
@@ -21,7 +22,9 @@ export async function GET() {
     statement = env.DB.prepare(`${base}, CASE WHEN r.author_id=? OR lower(r.author_email)=lower(?) OR EXISTS (SELECT 1 FROM report_shares s WHERE s.report_id=r.id AND lower(s.user_email)=lower(?)) THEN 1 ELSE 0 END AS can_edit FROM reports r LEFT JOIN attachments a ON a.report_id=r.id WHERE r.author_id=? OR lower(r.author_email)=lower(?) OR EXISTS (SELECT 1 FROM report_shares s WHERE s.report_id=r.id AND lower(s.user_email)=lower(?)) GROUP BY r.id ORDER BY r.updated_at DESC LIMIT 100`).bind(user.userId, user.email, user.userId, user.email, user.email, user.userId, user.email, user.email);
   }
   const result = await statement.all();
-  return Response.json({ reports: result.results, scope: role });
+  const members = await env.DB.prepare('SELECT email,name FROM team_members').all<{ email: string; name: string }>();
+  const names = new Map(members.results.map((member) => [member.email.toLowerCase(), member.name]));
+  return Response.json({ reports: result.results.map((report) => { const email = responsibleEmail(report); return { ...report, responsible_email: email, responsible_name: names.get(email.toLowerCase()) || email }; }), scope: role });
 }
 
 export async function POST(request: Request) {
@@ -33,6 +36,8 @@ export async function POST(request: Request) {
   if (fromTestRound) {
     const linked = await env.DB.prepare(`SELECT r.title AS round_title,r.version AS round_version,i.title AS item_title FROM test_rounds r JOIN test_items i ON i.round_id=r.id WHERE r.id=? AND i.id=?`).bind(roundId, itemId).first<{ round_title: string; round_version: string; item_title: string }>();
     if (!linked) return Response.json({ error: 'Selecione uma rodada e um teste válidos' }, { status: 400 });
+    const existingReport = await env.DB.prepare('SELECT id FROM reports WHERE from_test_round=1 AND test_item_id=? ORDER BY created_at DESC LIMIT 1').bind(itemId).first<{ id: string }>();
+    if (existingReport) return Response.json({ error: `Este teste já está vinculado ao report ${existingReport.id}.`, existingReportId: existingReport.id }, { status: 409 });
     roundTitle = linked.round_title; roundVersion = linked.round_version; itemTitle = linked.item_title;
   }
   const institution = value(data, 'institution') || (fromTestRound ? 'Rodada interna de testes' : ''), functionName = value(data, 'function'), systemPath = value(data, 'path');

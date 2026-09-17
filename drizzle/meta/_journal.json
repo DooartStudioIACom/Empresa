@@ -36,6 +36,27 @@
       "when": 1788277000000,
       "tag": "0004_report_sharing",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1788523849181,
+      "tag": "0005_overconfident_alice",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788534135995,
+      "tag": "0006_individual_deadline",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1789397672774,
+      "tag": "0007_jazzy_the_order",
+      "breakpoints": true
     }
   ]
 }

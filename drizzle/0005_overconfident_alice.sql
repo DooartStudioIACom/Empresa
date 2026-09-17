@@ -1,0 +1,1 @@
+ALTER TABLE `test_rounds` ADD `tags` text DEFAULT '[]' NOT NULL;

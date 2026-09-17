@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { ensureDatabase } from '@/lib/db-init';
 import { getTeamRole } from '@/lib/report-access';
+import { assignmentColumns, claimCorrectionSql, responsibleEmail } from '@/lib/report-assignment';
 
 export const dynamic = 'force-dynamic';
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -18,13 +19,18 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!user) return Response.json({ error: 'Não autenticado' }, { status: 401 });
   await ensureDatabase();
   const { id } = await params;
-  const report = await env.DB.prepare('SELECT * FROM reports WHERE id = ?').bind(id).first();
+  const report = await env.DB.prepare(`SELECT r.*, ${assignmentColumns} FROM reports r WHERE r.id = ?`).bind(id).first();
   if (!report) return Response.json({ error: 'Report não encontrado' }, { status: 404 });
   const role = await getTeamRole(user.email);
   const isOwner = report.author_id === user.userId || String(report.author_email || '').toLowerCase() === user.email.toLowerCase();
   const shared = isOwner ? true : Boolean(await env.DB.prepare('SELECT 1 FROM report_shares WHERE report_id=? AND lower(user_email)=lower(?)').bind(id, user.email).first());
   const roleAccess = role === 'manager' || (role === 'developer' && normalizeStatus(String(report.status || '')) === 'Com Desenvolvimento');
-  if (!isOwner && !shared && !roleAccess) return Response.json({ error: 'Este report não está disponível para o seu perfil.' }, { status: 403 });
+  const isAssigned = role === 'developer' && String(report.developer_email || '').toLowerCase() === user.email.toLowerCase();
+  if (!isOwner && !shared && !roleAccess && !isAssigned) return Response.json({ error: 'Este report não está disponível para o seu perfil.' }, { status: 403 });
+  const email = responsibleEmail(report);
+  const member = email ? await env.DB.prepare('SELECT name FROM team_members WHERE lower(email)=lower(?)').bind(email).first<{ name: string }>() : null;
+  report.responsible_email = email;
+  report.responsible_name = member?.name || email;
   const [attachments, activities] = await Promise.all([
     env.DB.prepare('SELECT id, file_name, content_type, byte_size, kind, created_at FROM attachments WHERE report_id = ? ORDER BY created_at ASC').bind(id).all(),
     env.DB.prepare('SELECT id, actor_email, action, message, created_at FROM activities WHERE report_id = ? ORDER BY created_at ASC').bind(id).all(),
@@ -46,6 +52,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const canEdit = isOwner || roleAccess || Boolean(await env.DB.prepare('SELECT 1 FROM report_shares WHERE report_id=? AND lower(user_email)=lower(?)').bind(id, user.email).first());
   if (!canEdit) return Response.json({ error: 'Este report está disponível somente para leitura. O autor precisa compartilhar a edição com você.' }, { status: 403 });
   const data = await request.formData();
+  if (field(data, 'action') === 'claim') {
+    if (role !== 'developer' || normalizeStatus(existing.status) !== 'Com Desenvolvimento') return Response.json({ error: 'Apenas um DEV pode assumir um report na etapa de Desenvolvimento.' }, { status: 403 });
+    const now = Date.now();
+    const activityId = crypto.randomUUID();
+    const result = await env.DB.batch([
+      env.DB.prepare(claimCorrectionSql).bind(activityId, user.userId, user.email, now, id, existing.status),
+      env.DB.prepare('UPDATE reports SET updated_at=? WHERE id=? AND EXISTS (SELECT 1 FROM activities WHERE id=?)').bind(now, id, activityId),
+    ]);
+    if (!result[0].meta.changes) return Response.json({ error: 'Este report já foi assumido ou mudou de etapa. Atualize para conferir.' }, { status: 409 });
+    return Response.json({ ok: true, status: normalizeStatus(existing.status) });
+  }
   const message = field(data, 'message');
   const currentStatus = normalizeStatus(existing.status);
   const requestedStatus = field(data, 'status');
@@ -54,6 +71,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return Response.json({ error: `Esta mudança não é permitida: ${currentStatus} → ${status}` }, { status: 400 });
   }
   if (status !== currentStatus && !canTransition(role, isOwner, currentStatus, status)) return Response.json({ error: 'Esta etapa deve ser concluída pelo perfil responsável no fluxo.' }, { status: 403 });
+  if (role === 'developer' && status !== currentStatus) {
+    const claim = await env.DB.prepare("SELECT actor_email FROM activities WHERE report_id=? AND action='correction_claimed' ORDER BY created_at DESC, id DESC LIMIT 1").bind(id).first<{ actor_email: string }>();
+    if (claim?.actor_email.toLowerCase() !== user.email.toLowerCase()) return Response.json({ error: 'A correção deve ser liberada pelo DEV que assumiu o report. Use Assumir correção se ainda não houver responsável.' }, { status: 403 });
+  }
   const attachmentValue = data.get('attachment');
   const attachment = attachmentValue instanceof File && attachmentValue.size > 0 ? attachmentValue : null;
   if (!message && status === currentStatus && !attachment) return Response.json({ error: 'Escreva uma resposta ou avance o fluxo' }, { status: 400 });
@@ -66,6 +87,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (message || changedStatus) {
       const activityMessage = changedStatus ? [transitionMessage(currentStatus, status), message].filter(Boolean).join(' ') : message;
       statements.push(env.DB.prepare('INSERT INTO activities (id,report_id,actor_id,actor_email,action,message,created_at) VALUES (?,?,?,?,?,?,?)').bind(crypto.randomUUID(), id, user.userId, user.email, changedStatus ? 'status_update' : 'comment', activityMessage, now));
+    }
+    if (changedStatus && status === 'Finalizado') {
+      statements.push(env.DB.prepare('INSERT INTO activities (id,report_id,actor_id,actor_email,action,message,created_at) VALUES (?,?,?,?,?,?,?)').bind(crypto.randomUUID(), id, user.userId, user.email, 'report_validated', 'Responsável pela validação final do reteste.', now + 1));
+    }
+    if (changedStatus && status === 'Aguardando reteste') {
+      statements.push(env.DB.prepare('INSERT INTO activities (id,report_id,actor_id,actor_email,action,message,created_at) VALUES (?,?,?,?,?,?,?)').bind(crypto.randomUUID(), id, user.userId, user.email, 'retest_assigned', `Reteste encaminhado ao autor do report: ${existing.author_email}.`, now + 1));
     }
     if (attachment) {
       const attachmentId = crypto.randomUUID();
