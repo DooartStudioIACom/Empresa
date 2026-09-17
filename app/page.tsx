@@ -93,6 +93,7 @@ export default function Home() {
   const [allBugsQuery, setAllBugsQuery] = useState('');
   const [allBugsError, setAllBugsError] = useState('');
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [headerUserMenuOpen, setHeaderUserMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
   async function handleLogout() {
@@ -133,7 +134,8 @@ export default function Home() {
 
   const userName = friendlyName(currentUser?.displayName, currentUser?.email);
   const userInitials = initials(userName);
-  const visibleNav = nav.filter((item) => currentUser.role === 'manager' || (item.id !== 'team' && item.id !== 'versions'));
+  const isManager = currentUser.role === 'manager';
+  const visibleNav = nav.filter((item) => isManager || (item.id !== 'team' && item.id !== 'versions'));
   const activeNavItem = nav.find((item) => item.id === activeSection);
   const pageTitle = activeSection === 'overview' ? `Olá, ${userName}` : activeNavItem?.label;
   const pageContext = activeSection === 'overview' ? 'Seu espaço de qualidade está pronto' : activeSection === 'reports' ? 'Central de chamados' : activeSection === 'rounds' ? 'Planejamento e execução' : activeSection === 'versions' ? 'Histórico de entregas' : 'Pessoas e responsabilidades';
@@ -369,91 +371,95 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#f4f7f5] text-[#16231d]">
-      <button type="button" onClick={toggleSidebar} aria-controls="main-sidebar" aria-expanded={!sidebarCollapsed} aria-label={sidebarCollapsed ? 'Mostrar menu lateral' : 'Recolher menu lateral'} title={sidebarCollapsed ? 'Mostrar menu lateral' : 'Recolher menu lateral'} className={`fixed top-[104px] z-30 hidden size-8 items-center justify-center rounded-full border border-[#b9d0c2] bg-white text-[#28583e] shadow-md transition-[left,background-color] duration-200 hover:bg-[#eaf5ed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#397657] motion-reduce:transition-none lg:flex ${sidebarCollapsed ? 'left-1' : 'left-[222px]'}`}><ChevronRight className={`size-4 transition-transform duration-200 motion-reduce:transition-none ${sidebarCollapsed ? '' : 'rotate-180'}`} /></button>
-      <aside id="main-sidebar" className={`fixed inset-y-0 left-0 z-20 hidden w-[238px] flex-col border-r border-[#dce5df] bg-[#10271d] text-white transition-[transform,visibility] duration-200 motion-reduce:transition-none lg:flex ${sidebarCollapsed ? 'invisible -translate-x-full' : 'visible translate-x-0'}`}>
-        <div className="flex h-[76px] items-center gap-3 border-b border-white/10 px-6">
-          <img src="/brand/bugs-on-the-table-logo.png" alt="" aria-hidden="true" className="size-10 shrink-0 object-contain drop-shadow-[0_5px_10px_rgba(215,255,102,.18)]" />
-          <div><p className="text-[15px] font-semibold tracking-tight">The Bugs on the Table</p><p className="text-[11px] text-white/48">Qualidade & produto</p></div>
-        </div>
-        <nav className="flex-1 space-y-1 px-3 py-6" aria-label="Navegação principal">
-          {visibleNav.map((item) => { const Icon = item.icon; return (
-            <button onClick={() => setActiveSection(item.id)} key={item.label} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[13px] transition ${activeSection === item.id ? 'bg-white/12 font-medium text-white' : 'text-white/60 hover:bg-white/7 hover:text-white'}`}>
-              <Icon className="size-[17px]" />{item.label}
-            </button>
-          ); })}
-        </nav>
-        <div className="mx-3 mb-3 rounded-2xl border border-white/10 bg-white/[0.055] p-4">
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#d7ff66]">Rodada ativa</p><p className="mt-2 text-sm font-semibold">{overviewRound?.title || 'Nenhuma rodada criada'}</p>
-          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10"><div style={{ width: `${overviewProgress}%` }} className="h-full rounded-full bg-[#d7ff66] transition-all" /></div>
-          <div className="mt-2 flex justify-between text-[11px] text-white/50"><span>{overviewRound?.items.length || 0} itens</span><span>{overviewProgress}%</span></div>
-        </div>
-        <div className="relative border-t border-white/10">
-          <button
-            type="button"
-            onClick={() => setUserMenuOpen((prev) => !prev)}
-            aria-expanded={userMenuOpen}
-            aria-haspopup="menu"
-            className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30"
-          >
-            <span className="grid size-8 place-items-center rounded-full bg-[#e7b68d] text-xs font-semibold text-[#4a2a14] shadow-sm">
-              {userInitials}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs font-medium text-white">
-                {currentUser?.displayName || 'Usuário conectado'}
-              </span>
-              <span className="block text-[10px] text-white/45">
-                {teamRoleName(currentUser.role)}
-              </span>
-            </span>
-            <span className={`grid size-6 place-items-center rounded-md transition ${userMenuOpen ? 'bg-white/15 text-white' : 'text-white/40 hover:bg-white/10 hover:text-white'}`}>
-              <MoreHorizontal className="size-4" />
-            </span>
-          </button>
-
-          {userMenuOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-30"
-                onClick={() => setUserMenuOpen(false)}
-                aria-hidden="true"
-              />
-              <div
-                role="menu"
-                className="absolute bottom-full left-3 right-3 z-40 mb-2 overflow-hidden rounded-2xl border border-white/15 bg-[#173e2c] p-1.5 shadow-[0_18px_45px_rgba(0,0,0,0.55)] ring-1 ring-black/20 backdrop-blur-md"
+      {isManager && (
+        <>
+          <button type="button" onClick={toggleSidebar} aria-controls="main-sidebar" aria-expanded={!sidebarCollapsed} aria-label={sidebarCollapsed ? 'Mostrar menu lateral' : 'Recolher menu lateral'} title={sidebarCollapsed ? 'Mostrar menu lateral' : 'Recolher menu lateral'} className={`fixed top-[104px] z-30 hidden size-8 items-center justify-center rounded-full border border-[#b9d0c2] bg-white text-[#28583e] shadow-md transition-[left,background-color] duration-200 hover:bg-[#eaf5ed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#397657] motion-reduce:transition-none lg:flex ${sidebarCollapsed ? 'left-1' : 'left-[222px]'}`}><ChevronRight className={`size-4 transition-transform duration-200 motion-reduce:transition-none ${sidebarCollapsed ? '' : 'rotate-180'}`} /></button>
+          <aside id="main-sidebar" className={`fixed inset-y-0 left-0 z-20 hidden w-[238px] flex-col border-r border-[#dce5df] bg-[#10271d] text-white transition-[transform,visibility] duration-200 motion-reduce:transition-none lg:flex ${sidebarCollapsed ? 'invisible -translate-x-full' : 'visible translate-x-0'}`}>
+            <div className="flex h-[76px] items-center gap-3 border-b border-white/10 px-6">
+              <img src="/brand/bugs-on-the-table-logo.png" alt="" aria-hidden="true" className="size-10 shrink-0 object-contain drop-shadow-[0_5px_10px_rgba(215,255,102,.18)]" />
+              <div><p className="text-[15px] font-semibold tracking-tight">The Bugs on the Table</p><p className="text-[11px] text-white/48">Qualidade & produto</p></div>
+            </div>
+            <nav className="flex-1 space-y-1 px-3 py-6" aria-label="Navegação principal">
+              {visibleNav.map((item) => { const Icon = item.icon; return (
+                <button onClick={() => setActiveSection(item.id)} key={item.label} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[13px] transition ${activeSection === item.id ? 'bg-white/12 font-medium text-white' : 'text-white/60 hover:bg-white/7 hover:text-white'}`}>
+                  <Icon className="size-[17px]" />{item.label}
+                </button>
+              ); })}
+            </nav>
+            <div className="mx-3 mb-3 rounded-2xl border border-white/10 bg-white/[0.055] p-4">
+              <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#d7ff66]">Rodada ativa</p><p className="mt-2 text-sm font-semibold">{overviewRound?.title || 'Nenhuma rodada criada'}</p>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10"><div style={{ width: `${overviewProgress}%` }} className="h-full rounded-full bg-[#d7ff66] transition-all" /></div>
+              <div className="mt-2 flex justify-between text-[11px] text-white/50"><span>{overviewRound?.items.length || 0} itens</span><span>{overviewProgress}%</span></div>
+            </div>
+            <div className="relative border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setUserMenuOpen((prev) => !prev)}
+                aria-expanded={userMenuOpen}
+                aria-haspopup="menu"
+                className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30"
               >
-                <div className="border-b border-white/10 px-3 py-2.5">
-                  <p className="truncate text-xs font-semibold text-white">
-                    {currentUser?.displayName || userName}
-                  </p>
-                  <p className="truncate text-[10px] text-white/55">
-                    {currentUser?.email}
-                  </p>
-                  <span className="mt-1.5 inline-block rounded-md bg-white/10 px-2 py-0.5 text-[9px] font-medium text-[#d7ff66]">
+                <span className="grid size-8 place-items-center rounded-full bg-[#e7b68d] text-xs font-semibold text-[#4a2a14] shadow-sm">
+                  {userInitials}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-medium text-white">
+                    {currentUser?.displayName || 'Usuário conectado'}
+                  </span>
+                  <span className="block text-[10px] text-white/45">
                     {teamRoleName(currentUser.role)}
                   </span>
-                </div>
-                <button
-                  type="button"
-                  role="menuitem"
-                  disabled={loggingOut}
-                  onClick={handleLogout}
-                  className="mt-1 flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-medium text-[#ff8f82] transition hover:bg-[#b8382c]/20 hover:text-[#ffb2a8] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-400 disabled:opacity-60"
-                >
-                  {loggingOut ? (
-                    <LoaderCircle className="size-4 animate-spin text-[#ff8f82]" />
-                  ) : (
-                    <LogOut className="size-4 text-[#ff8f82]" />
-                  )}
-                  <span>{loggingOut ? 'Saindo da conta...' : 'Deslogar da conta'}</span>
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </aside>
+                </span>
+                <span className={`grid size-6 place-items-center rounded-md transition ${userMenuOpen ? 'bg-white/15 text-white' : 'text-white/40 hover:bg-white/10 hover:text-white'}`}>
+                  <MoreHorizontal className="size-4" />
+                </span>
+              </button>
 
-      <main className={`transition-[margin-left] duration-200 motion-reduce:transition-none ${sidebarCollapsed ? 'lg:ml-9' : 'lg:ml-[238px]'}`}>
+              {userMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-30"
+                    onClick={() => setUserMenuOpen(false)}
+                    aria-hidden="true"
+                  />
+                  <div
+                    role="menu"
+                    className="absolute bottom-full left-3 right-3 z-40 mb-2 overflow-hidden rounded-2xl border border-white/15 bg-[#173e2c] p-1.5 shadow-[0_18px_45px_rgba(0,0,0,0.55)] ring-1 ring-black/20 backdrop-blur-md"
+                  >
+                    <div className="border-b border-white/10 px-3 py-2.5">
+                      <p className="truncate text-xs font-semibold text-white">
+                        {currentUser?.displayName || userName}
+                      </p>
+                      <p className="truncate text-[10px] text-white/55">
+                        {currentUser?.email}
+                      </p>
+                      <span className="mt-1.5 inline-block rounded-md bg-white/10 px-2 py-0.5 text-[9px] font-medium text-[#d7ff66]">
+                        {teamRoleName(currentUser.role)}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={loggingOut}
+                      onClick={handleLogout}
+                      className="mt-1 flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-medium text-[#ff8f82] transition hover:bg-[#b8382c]/20 hover:text-[#ffb2a8] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-400 disabled:opacity-60"
+                    >
+                      {loggingOut ? (
+                        <LoaderCircle className="size-4 animate-spin text-[#ff8f82]" />
+                      ) : (
+                        <LogOut className="size-4 text-[#ff8f82]" />
+                      )}
+                      <span>{loggingOut ? 'Saindo da conta...' : 'Deslogar da conta'}</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </aside>
+        </>
+      )}
+
+      <main className={`transition-[margin-left] duration-200 motion-reduce:transition-none ${isManager ? (sidebarCollapsed ? 'lg:ml-9' : 'lg:ml-[238px]') : 'lg:ml-0'}`}>
         <header className="sticky top-0 z-10 border-b border-[#dbe5df] bg-[#f4f7f5]/95 py-2.5 backdrop-blur-xl">
           <div className="mx-auto max-w-[1420px] px-5 sm:px-8">
             <div className={`classic-command-header relative isolate flex min-h-[76px] w-full items-center justify-between overflow-hidden rounded-[22px] border border-[#c8d8ce] px-4 shadow-[0_12px_34px_-28px_#173e2c] sm:px-5 ${activeSection === 'rounds' ? 'command-rounds-header' : ''}`}>
@@ -469,18 +475,90 @@ export default function Home() {
                   {activeSection !== 'overview' && <Button onClick={() => setActiveSection('overview')} variant="ghost" aria-label="Voltar à visão geral" className="h-8 rounded-[10px] px-2.5 text-[#315c43] hover:bg-[#edf5f0] sm:px-3"><LayoutDashboard className="size-4" /><span className="hidden sm:inline">Visão geral</span></Button>}
                   <Button variant="ghost" size="icon" aria-label="Notificações" className="relative size-8 rounded-[10px] text-[#496355] hover:bg-[#edf5f0]"><Bell className="size-4" /><span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-[#ef6a5b] ring-2 ring-white" /></Button>
                 </div>
-                  {(activeSection !== 'rounds' || currentUser.role === 'manager') && <Button onClick={() => activeSection === 'rounds' ? window.dispatchEvent(new Event('open-new-round')) : setNewReportOpen(true)} aria-label={activeSection === 'rounds' ? 'Criar nova rodada' : 'Criar novo report'} className={`h-9 rounded-xl px-3.5 text-white shadow-[0_8px_20px_-14px_#173e2c] transition hover:-translate-y-0.5 sm:px-4 ${activeSection === 'rounds' ? 'bg-[linear-gradient(135deg,#173e2c,#2a6848)] ring-1 ring-[#7eaa8e]/25 hover:bg-[#24573f]' : 'bg-[#173e2c] hover:bg-[#24573f]'}`}><Plus className={`size-4 ${activeSection === 'rounds' ? 'text-[#d7ff66]' : ''}`} /><span className="hidden sm:inline">{activeSection === 'rounds' ? 'Nova rodada' : 'Novo report'}</span><span className="sm:hidden">{activeSection === 'rounds' ? 'Rodada' : 'Report'}</span></Button>}
+                {(activeSection !== 'rounds' || isManager) && <Button onClick={() => activeSection === 'rounds' ? window.dispatchEvent(new Event('open-new-round')) : setNewReportOpen(true)} aria-label={activeSection === 'rounds' ? 'Criar nova rodada' : 'Criar novo report'} className={`h-9 rounded-xl px-3.5 text-white shadow-[0_8px_20px_-14px_#173e2c] transition hover:-translate-y-0.5 sm:px-4 ${activeSection === 'rounds' ? 'bg-[linear-gradient(135deg,#173e2c,#2a6848)] ring-1 ring-[#7eaa8e]/25 hover:bg-[#24573f]' : 'bg-[#173e2c] hover:bg-[#24573f]'}`}><Plus className={`size-4 ${activeSection === 'rounds' ? 'text-[#d7ff66]' : ''}`} /><span className="hidden sm:inline">{activeSection === 'rounds' ? 'Nova rodada' : 'Novo report'}</span><span className="sm:hidden">{activeSection === 'rounds' ? 'Rodada' : 'Report'}</span></Button>}
+
+                {/* Perfil e botão de deslogar no header */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setHeaderUserMenuOpen((prev) => !prev)}
+                    aria-expanded={headerUserMenuOpen}
+                    aria-haspopup="menu"
+                    className="flex items-center gap-2 rounded-xl border border-[#cfe0d5] bg-white/80 px-2.5 py-1.5 shadow-sm transition hover:border-[#9ec1aa] hover:bg-white"
+                  >
+                    <span className="grid size-7 place-items-center rounded-full bg-[#e7b68d] text-[11px] font-semibold text-[#4a2a14] shadow-xs">
+                      {userInitials}
+                    </span>
+                    <span className="hidden text-left sm:block">
+                      <span className="block max-w-[100px] truncate text-xs font-semibold text-[#1b3025]">{userName}</span>
+                      <span className="block text-[9px] text-[#6b7b72]">{teamRoleName(currentUser.role)}</span>
+                    </span>
+                    <MoreHorizontal className="size-3.5 text-[#5e7468]" />
+                  </button>
+
+                  {headerUserMenuOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-30"
+                        onClick={() => setHeaderUserMenuOpen(false)}
+                        aria-hidden="true"
+                      />
+                      <div
+                        role="menu"
+                        className="absolute right-0 top-full z-40 mt-2 w-56 overflow-hidden rounded-2xl border border-[#d6e3db] bg-white p-1.5 shadow-[0_18px_45px_rgba(0,0,0,0.18)]"
+                      >
+                        <div className="border-b border-[#e5ece7] px-3 py-2.5">
+                          <p className="truncate text-xs font-semibold text-[#1b3025]">{currentUser?.displayName || userName}</p>
+                          <p className="truncate text-[10px] text-[#6b7b72]">{currentUser?.email}</p>
+                          <span className="mt-1.5 inline-block rounded-md bg-[#edf6f0] px-2 py-0.5 text-[9px] font-semibold text-[#347850]">
+                            {teamRoleName(currentUser.role)}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={loggingOut}
+                          onClick={handleLogout}
+                          className="mt-1 flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#c04637] transition hover:bg-[#fff0ed] disabled:opacity-60"
+                        >
+                          {loggingOut ? (
+                            <LoaderCircle className="size-4 animate-spin text-[#c04637]" />
+                          ) : (
+                            <LogOut className="size-4 text-[#c04637]" />
+                          )}
+                          <span>{loggingOut ? 'Saindo da conta...' : 'Deslogar da conta'}</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </header>
 
-        <nav className="flex items-center gap-1 overflow-x-auto border-b border-[#dce5df] bg-white px-4 py-2 lg:hidden" aria-label="Navegação principal móvel">
-          {visibleNav.map((item) => { const Icon = item.icon; return <button onClick={() => setActiveSection(item.id)} key={item.id} className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium ${activeSection === item.id ? 'bg-[#eaf3ed] text-[#245b3d]' : 'text-[#6f7f76]'}`}><Icon className="size-3.5" />{item.label}</button>; })}
-          <button type="button" disabled={loggingOut} onClick={handleLogout} className="ml-auto flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-medium text-[#b4483a] transition hover:bg-[#fff0ed] disabled:opacity-60" title="Deslogar da conta">
-            {loggingOut ? <LoaderCircle className="size-3.5 animate-spin" /> : <LogOut className="size-3.5" />}
-            <span>Sair</span>
-          </button>
+        <nav className={`flex items-center gap-1.5 overflow-x-auto border-b border-[#dce5df] bg-white px-5 py-2.5 ${isManager ? 'lg:hidden' : ''}`} aria-label="Navegação principal">
+          <div className="mx-auto flex w-full max-w-[1420px] items-center gap-1.5">
+            {visibleNav.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeSection === item.id;
+              return (
+                <button
+                  type="button"
+                  onClick={() => setActiveSection(item.id)}
+                  key={item.id}
+                  className={`flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
+                    isActive
+                      ? 'bg-[#173e2c] text-white shadow-sm'
+                      : 'text-[#485950] hover:bg-[#edf4ef] hover:text-[#173e2c]'
+                  }`}
+                >
+                  <Icon className="size-3.5" />
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
         </nav>
 
         <div className="mx-auto max-w-[1420px] px-5 py-7 sm:px-8">
