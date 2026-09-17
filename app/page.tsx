@@ -468,7 +468,65 @@ export default function Home() {
               <div className="pointer-events-none absolute inset-y-3 left-0 w-[3px] rounded-r-full bg-[linear-gradient(180deg,#173e2c,#7daf88,#d7ff66)]" />
               <div className="relative z-[1] flex min-w-0 items-center gap-3.5">
                 <span className="grid size-11 shrink-0 place-items-center rounded-[14px] bg-[#173e2c] p-1 shadow-sm ring-1 ring-white/70"><img src="/brand/bugs-on-the-table-logo.png" alt="" aria-hidden="true" className="size-full object-contain" /></span>
-                <div className="min-w-0"><div className="flex items-center gap-2"><p className="truncate text-[9px] font-bold uppercase tracking-[0.17em] text-[#477058]">The Bugs on the Table</p><span className="size-1 rounded-full bg-[#9ab2a2]" /><p className="hidden truncate text-[9px] font-semibold uppercase tracking-[.1em] text-[#7f9187] sm:block">{pageContext}</p></div><h1 className="mt-1 truncate text-[19px] font-semibold tracking-[-0.03em] text-[#1b3025]">{pageTitle}</h1></div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-[9px] font-bold uppercase tracking-[0.17em] text-[#477058]">The Bugs on the Table</p>
+                    <span className="size-1 rounded-full bg-[#9ab2a2]" />
+                    <p className="hidden truncate text-[9px] font-semibold uppercase tracking-[.1em] text-[#7f9187] sm:block">{pageContext}</p>
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-2">
+                    <h1 className="truncate text-[19px] font-semibold tracking-[-0.03em] text-[#1b3025]">{pageTitle}</h1>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setHeaderUserMenuOpen((prev) => !prev)}
+                        aria-expanded={headerUserMenuOpen}
+                        aria-haspopup="menu"
+                        aria-label="Opções da conta"
+                        title="Opções da conta e deslogar"
+                        className="grid size-6 place-items-center rounded-lg border border-[#cbe0d3] bg-white/90 text-[#496656] shadow-xs transition hover:border-[#9ec1aa] hover:bg-[#edf5f0] hover:text-[#173e2c] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#397657]"
+                      >
+                        <MoreHorizontal className="size-3.5" />
+                      </button>
+
+                      {headerUserMenuOpen && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-30"
+                            onClick={() => setHeaderUserMenuOpen(false)}
+                            aria-hidden="true"
+                          />
+                          <div
+                            role="menu"
+                            className="absolute left-0 top-full z-40 mt-2 w-60 overflow-hidden rounded-2xl border border-[#d6e3db] bg-white p-1.5 shadow-[0_18px_45px_rgba(0,0,0,0.18)]"
+                          >
+                            <div className="border-b border-[#e5ece7] px-3 py-2.5">
+                              <p className="truncate text-xs font-semibold text-[#1b3025]">{currentUser?.displayName || userName}</p>
+                              <p className="truncate text-[10px] text-[#6b7b72]">{currentUser?.email}</p>
+                              <span className="mt-1.5 inline-block rounded-md bg-[#edf6f0] px-2 py-0.5 text-[9px] font-semibold text-[#347850]">
+                                {teamRoleName(currentUser.role)}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              disabled={loggingOut}
+                              onClick={handleLogout}
+                              className="mt-1 flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#c04637] transition hover:bg-[#fff0ed] disabled:opacity-60"
+                            >
+                              {loggingOut ? (
+                                <LoaderCircle className="size-4 animate-spin text-[#c04637]" />
+                              ) : (
+                                <LogOut className="size-4 text-[#c04637]" />
+                              )}
+                              <span>{loggingOut ? 'Saindo da conta...' : 'Deslogar da conta'}</span>
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
               <div className="relative z-[2] ml-4 flex shrink-0 items-center gap-2.5 border-l border-[#cddbd2] pl-3 sm:pl-4">
                 <div className="flex items-center gap-1 rounded-[14px] border border-[#d3e0d8] bg-white/70 p-1 shadow-sm backdrop-blur">
@@ -476,62 +534,6 @@ export default function Home() {
                   <Button variant="ghost" size="icon" aria-label="Notificações" className="relative size-8 rounded-[10px] text-[#496355] hover:bg-[#edf5f0]"><Bell className="size-4" /><span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-[#ef6a5b] ring-2 ring-white" /></Button>
                 </div>
                 {(activeSection !== 'rounds' || isManager) && <Button onClick={() => activeSection === 'rounds' ? window.dispatchEvent(new Event('open-new-round')) : setNewReportOpen(true)} aria-label={activeSection === 'rounds' ? 'Criar nova rodada' : 'Criar novo report'} className={`h-9 rounded-xl px-3.5 text-white shadow-[0_8px_20px_-14px_#173e2c] transition hover:-translate-y-0.5 sm:px-4 ${activeSection === 'rounds' ? 'bg-[linear-gradient(135deg,#173e2c,#2a6848)] ring-1 ring-[#7eaa8e]/25 hover:bg-[#24573f]' : 'bg-[#173e2c] hover:bg-[#24573f]'}`}><Plus className={`size-4 ${activeSection === 'rounds' ? 'text-[#d7ff66]' : ''}`} /><span className="hidden sm:inline">{activeSection === 'rounds' ? 'Nova rodada' : 'Novo report'}</span><span className="sm:hidden">{activeSection === 'rounds' ? 'Rodada' : 'Report'}</span></Button>}
-
-                {/* Perfil e botão de deslogar no header */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setHeaderUserMenuOpen((prev) => !prev)}
-                    aria-expanded={headerUserMenuOpen}
-                    aria-haspopup="menu"
-                    className="flex items-center gap-2 rounded-xl border border-[#cfe0d5] bg-white/80 px-2.5 py-1.5 shadow-sm transition hover:border-[#9ec1aa] hover:bg-white"
-                  >
-                    <span className="grid size-7 place-items-center rounded-full bg-[#e7b68d] text-[11px] font-semibold text-[#4a2a14] shadow-xs">
-                      {userInitials}
-                    </span>
-                    <span className="hidden text-left sm:block">
-                      <span className="block max-w-[100px] truncate text-xs font-semibold text-[#1b3025]">{userName}</span>
-                      <span className="block text-[9px] text-[#6b7b72]">{teamRoleName(currentUser.role)}</span>
-                    </span>
-                    <MoreHorizontal className="size-3.5 text-[#5e7468]" />
-                  </button>
-
-                  {headerUserMenuOpen && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-30"
-                        onClick={() => setHeaderUserMenuOpen(false)}
-                        aria-hidden="true"
-                      />
-                      <div
-                        role="menu"
-                        className="absolute right-0 top-full z-40 mt-2 w-56 overflow-hidden rounded-2xl border border-[#d6e3db] bg-white p-1.5 shadow-[0_18px_45px_rgba(0,0,0,0.18)]"
-                      >
-                        <div className="border-b border-[#e5ece7] px-3 py-2.5">
-                          <p className="truncate text-xs font-semibold text-[#1b3025]">{currentUser?.displayName || userName}</p>
-                          <p className="truncate text-[10px] text-[#6b7b72]">{currentUser?.email}</p>
-                          <span className="mt-1.5 inline-block rounded-md bg-[#edf6f0] px-2 py-0.5 text-[9px] font-semibold text-[#347850]">
-                            {teamRoleName(currentUser.role)}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          disabled={loggingOut}
-                          onClick={handleLogout}
-                          className="mt-1 flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-[#c04637] transition hover:bg-[#fff0ed] disabled:opacity-60"
-                        >
-                          {loggingOut ? (
-                            <LoaderCircle className="size-4 animate-spin text-[#c04637]" />
-                          ) : (
-                            <LogOut className="size-4 text-[#c04637]" />
-                          )}
-                          <span>{loggingOut ? 'Saindo da conta...' : 'Deslogar da conta'}</span>
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
               </div>
             </div>
           </div>
