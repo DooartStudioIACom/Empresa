@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
-import { Activity, AlertTriangle, Bell, Bug, Building2, CalendarDays, Check, CheckCircle2, ChevronRight, Circle, CircleCheck, Clock3, Code2, Copy, Eye, ExternalLink, FileArchive, FileImage, FlaskConical, LayoutDashboard, Link2, ListChecks, LoaderCircle, Mail, MessageSquareText, MoreHorizontal, PackageCheck, Paperclip, PlayCircle, Plus, Search, Share2, ShieldCheck, Sparkles, Tags, UploadCloud, UserPlus, Users, X } from 'lucide-react';
+import { Activity, AlertTriangle, Bell, Bug, Building2, CalendarDays, Check, CheckCircle2, ChevronRight, Circle, CircleCheck, Clock3, Code2, Copy, Eye, ExternalLink, FileArchive, FileImage, FlaskConical, LayoutDashboard, Link2, ListChecks, LoaderCircle, LogOut, Mail, MessageSquareText, MoreHorizontal, PackageCheck, Paperclip, PlayCircle, Plus, Search, Share2, ShieldCheck, Sparkles, Tags, UploadCloud, UserPlus, Users, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Badge } from '@/components/ui/badge';
@@ -92,6 +92,18 @@ export default function Home() {
   const [allBugsLoading, setAllBugsLoading] = useState(false);
   const [allBugsQuery, setAllBugsQuery] = useState('');
   const [allBugsError, setAllBugsError] = useState('');
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    try {
+      await fetch('/api/logout', { method: 'POST' });
+    } catch {
+      /* Continuar mesmo se houver erro de rede */
+    }
+    window.location.reload();
+  }
 
   useEffect(() => {
     fetch('/api/me')
@@ -375,10 +387,70 @@ export default function Home() {
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10"><div style={{ width: `${overviewProgress}%` }} className="h-full rounded-full bg-[#d7ff66] transition-all" /></div>
           <div className="mt-2 flex justify-between text-[11px] text-white/50"><span>{overviewRound?.items.length || 0} itens</span><span>{overviewProgress}%</span></div>
         </div>
-        <button className="flex items-center gap-3 border-t border-white/10 px-5 py-5 text-left">
-          <span className="grid size-8 place-items-center rounded-full bg-[#e7b68d] text-xs font-semibold text-[#4a2a14]">{userInitials}</span>
-          <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium">{currentUser?.displayName || 'Usuário conectado'}</span><span className="block text-[10px] text-white/45">{teamRoleName(currentUser.role)}</span></span><MoreHorizontal className="size-4 text-white/40" />
-        </button>
+        <div className="relative border-t border-white/10">
+          <button
+            type="button"
+            onClick={() => setUserMenuOpen((prev) => !prev)}
+            aria-expanded={userMenuOpen}
+            aria-haspopup="menu"
+            className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30"
+          >
+            <span className="grid size-8 place-items-center rounded-full bg-[#e7b68d] text-xs font-semibold text-[#4a2a14] shadow-sm">
+              {userInitials}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-xs font-medium text-white">
+                {currentUser?.displayName || 'Usuário conectado'}
+              </span>
+              <span className="block text-[10px] text-white/45">
+                {teamRoleName(currentUser.role)}
+              </span>
+            </span>
+            <span className={`grid size-6 place-items-center rounded-md transition ${userMenuOpen ? 'bg-white/15 text-white' : 'text-white/40 hover:bg-white/10 hover:text-white'}`}>
+              <MoreHorizontal className="size-4" />
+            </span>
+          </button>
+
+          {userMenuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-30"
+                onClick={() => setUserMenuOpen(false)}
+                aria-hidden="true"
+              />
+              <div
+                role="menu"
+                className="absolute bottom-full left-3 right-3 z-40 mb-2 overflow-hidden rounded-2xl border border-white/15 bg-[#173e2c] p-1.5 shadow-[0_18px_45px_rgba(0,0,0,0.55)] ring-1 ring-black/20 backdrop-blur-md"
+              >
+                <div className="border-b border-white/10 px-3 py-2.5">
+                  <p className="truncate text-xs font-semibold text-white">
+                    {currentUser?.displayName || userName}
+                  </p>
+                  <p className="truncate text-[10px] text-white/55">
+                    {currentUser?.email}
+                  </p>
+                  <span className="mt-1.5 inline-block rounded-md bg-white/10 px-2 py-0.5 text-[9px] font-medium text-[#d7ff66]">
+                    {teamRoleName(currentUser.role)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={loggingOut}
+                  onClick={handleLogout}
+                  className="mt-1 flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-medium text-[#ff8f82] transition hover:bg-[#b8382c]/20 hover:text-[#ffb2a8] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-400 disabled:opacity-60"
+                >
+                  {loggingOut ? (
+                    <LoaderCircle className="size-4 animate-spin text-[#ff8f82]" />
+                  ) : (
+                    <LogOut className="size-4 text-[#ff8f82]" />
+                  )}
+                  <span>{loggingOut ? 'Saindo da conta...' : 'Deslogar da conta'}</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </aside>
 
       <main className={`transition-[margin-left] duration-200 motion-reduce:transition-none ${sidebarCollapsed ? 'lg:ml-9' : 'lg:ml-[238px]'}`}>
@@ -403,8 +475,12 @@ export default function Home() {
           </div>
         </header>
 
-        <nav className="flex gap-1 overflow-x-auto border-b border-[#dce5df] bg-white px-4 py-2 lg:hidden" aria-label="Navegação principal móvel">
+        <nav className="flex items-center gap-1 overflow-x-auto border-b border-[#dce5df] bg-white px-4 py-2 lg:hidden" aria-label="Navegação principal móvel">
           {visibleNav.map((item) => { const Icon = item.icon; return <button onClick={() => setActiveSection(item.id)} key={item.id} className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium ${activeSection === item.id ? 'bg-[#eaf3ed] text-[#245b3d]' : 'text-[#6f7f76]'}`}><Icon className="size-3.5" />{item.label}</button>; })}
+          <button type="button" disabled={loggingOut} onClick={handleLogout} className="ml-auto flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-medium text-[#b4483a] transition hover:bg-[#fff0ed] disabled:opacity-60" title="Deslogar da conta">
+            {loggingOut ? <LoaderCircle className="size-3.5 animate-spin" /> : <LogOut className="size-3.5" />}
+            <span>Sair</span>
+          </button>
         </nav>
 
         <div className="mx-auto max-w-[1420px] px-5 py-7 sm:px-8">
